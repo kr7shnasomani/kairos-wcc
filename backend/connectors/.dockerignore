@@ -1,0 +1,35 @@
+# =============================================================================
+# Kairos — backend/connectors/.dockerignore
+# Build context: ./backend/connectors  (used by kairos-backend-go)
+# Multi-stage build: only the compiled binary lands in the release image.
+# This file speeds up the builder stage by trimming the COPY . . sent to it.
+# =============================================================================
+
+# --- Go build cache & test artifacts ---
+*.test
+*.out
+coverage.txt
+.testcache/
+
+# --- Vendor (if present — we use go mod download instead) ---
+vendor/
+
+# --- Secrets ---
+.env
+.env.local
+*.pem
+*.key
+
+# --- Fixture data (mounted as a Docker volume at runtime, not baked in) ---
+# Keep fixtures/ for the builder so tests can reference them, but exclude large ones:
+# (currently only sample_assets.json — fine to keep)
+
+# --- IDE / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
+
+# --- Dockerfile itself ---
+Dockerfile

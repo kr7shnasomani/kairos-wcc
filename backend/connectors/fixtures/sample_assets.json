@@ -1,0 +1,57 @@
+[
+  {
+    "asset_id": "P-101",
+    "tag_number": "P-101",
+    "name": "Centrifugal Pump P-101",
+    "equipment_class": "pump",
+    "criticality": "safety_critical",
+    "site_id": "SITE_001",
+    "facility_id": "FAC_PROCESS_A",
+    "parent_asset_id": null,
+    "eam_source": "SAP_PM"
+  },
+  {
+    "asset_id": "V-201",
+    "tag_number": "V-201",
+    "name": "Pressure Vessel V-201",
+    "equipment_class": "vessel",
+    "criticality": "critical",
+    "site_id": "SITE_001",
+    "facility_id": "FAC_PROCESS_A",
+    "parent_asset_id": null,
+    "eam_source": "SAP_PM"
+  },
+  {
+    "asset_id": "HX-301",
+    "tag_number": "HX-301",
+    "name": "Heat Exchanger HX-301",
+    "equipment_class": "heat_exchanger",
+    "criticality": "critical",
+    "site_id": "SITE_001",
+    "facility_id": "FAC_UTILITIES",
+    "parent_asset_id": null,
+    "eam_source": "SAP_PM"
+  },
+  {
+    "asset_id": "C-401",
+    "tag_number": "C-401",
+    "name": "Compressor C-401",
+    "equipment_class": "compressor",
+    "criticality": "safety_critical",
+    "site_id": "SITE_001",
+    "facility_id": "FAC_COMPRESSION",
+    "parent_asset_id": null,
+    "eam_source": "SAP_PM"
+  },
+  {
+    "asset_id": "T-501",
+    "tag_number": "T-501",
+    "name": "Storage Tank T-501",
+    "equipment_class": "tank",
+    "criticality": "non_critical",
+    "site_id": "SITE_001",
+    "facility_id": "FAC_STORAGE",
+    "parent_asset_id": null,
+    "eam_source": "SAP_PM"
+  }
+]
