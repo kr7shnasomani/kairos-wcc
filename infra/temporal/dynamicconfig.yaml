@@ -1,0 +1,9 @@
+frontend.workflowMaximumRetentionPeriod:
+  - value: "720h"
+    constraints: {}
+limit.maxWorkflowRetentionInDays:
+  - value: 30
+    constraints: {}
+history.maximumSizeInBytes:
+  - value: 50000000
+    constraints: {}
