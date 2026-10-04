@@ -1,0 +1,16 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "background": "#ffffff",
+    "fontFamily": "arial, sans-serif",
+    "fontSize": "14px",
+    "lineColor": "#000000",
+    "textColor": "#28253D",
+    "primaryTextColor": "#28253D",
+    "clusterBkg": "#F9F9FB",
+    "clusterBorder": "#BDBCCC",
+    "edgeLabelBackground": "hsl(-120, 0%, 80%)",
+    "titleColor": "#28253D"
+  },
+  "flowchart": { "htmlLabels": true }
+}

@@ -1,0 +1,107 @@
+# =============================================================================
+# Kairos — DEV override (auto-loaded by `docker compose up` / `make dev`)
+#
+# Layers local-development conveniences on top of the production base:
+#   • source bind-mounts + hot-reload commands (uvicorn --reload, next dev,
+#     go run) so code edits apply live
+#   • runs as root to avoid bind-mount permission friction
+#   • publishes every internal datastore + UI port to the host for debugging
+#
+# The deployment server never uses this file (it is not even copied there):
+#   make prod   # == docker compose -f docker-compose.yml --profile prod up -d <services>
+# See docs/DEPLOY.md.
+# =============================================================================
+
+services:
+
+  # --- Frontend: dev server + hot-reload -----------------------------------
+  kairos-frontend:
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      # `src/app/landing-figures.test.ts` reads `<cwd>/../benchmark/RESULTS.md` to prove the
+      # landing page's eval figures still match the benchmark of record. On the host that
+      # resolves; in the container cwd is /app, so it looked for /benchmark and the suite failed
+      # to collect. CLAUDE.md requires vitest to run in Docker, so the mount is the fix rather
+      # than the test. Read-only: the frontend must never write the benchmark of record.
+      - ./benchmark:/benchmark:ro
+      # The public /docs section reads the repository's docs/ folder (`../docs` from /app).
+      - ./docs:/docs:ro
+
+  # --- API: --reload + source mount ----------------------------------------
+  kairos-backend-api:
+    user: root
+    volumes:
+      - ./backend:/app
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # --- Celery worker: source mount -----------------------------------------
+  kairos-celery-worker:
+    user: root
+    volumes:
+      - ./backend:/app
+
+  # --- Temporal activity worker: source mount ------------------------------
+  kairos-temporal-activity-worker:
+    user: root
+    volumes:
+      - ./backend:/app
+
+  # --- Elicitation worker: source mount ------------------------------------
+  kairos-elicitation-worker:
+    user: root
+    volumes:
+      - ./backend:/app
+
+  # --- Go connector: `go run` hot-ish + source mount -----------------------
+  kairos-backend-go:
+    build:
+      target: builder
+    ports:
+      - "127.0.0.1:8090:8090"   # loopback only: the connector forwards to the API as admin
+    volumes:
+      - ./backend/connectors:/app
+    command: ["go", "run", "./cmd/connector/..."]
+
+  # --- Datastores + observability: publish ports for local debugging -------
+  # Neo4j + Qdrant are CLOUD by default and profile-gated in the base. These port maps only take
+  # effect when you also pass `--profile local-stores` (i.e. when the local containers actually run);
+  # with a plain `docker compose up` they are inert.
+  kairos-neo4j:
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+
+  kairos-qdrant:
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+
+  kairos-elasticsearch:
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+
+  kairos-redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  kairos-temporal:
+    ports:
+      - "127.0.0.1:7233:7233"
+
+  kairos-temporal-ui:
+    ports:
+      - "127.0.0.1:8088:8080"
+
+  kairos-opa:
+    ports:
+      - "127.0.0.1:8181:8181"
+
+
