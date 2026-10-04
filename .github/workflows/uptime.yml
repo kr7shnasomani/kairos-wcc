@@ -1,0 +1,187 @@
+name: Uptime
+
+# Aura Free pauses an instance after 3 days idle, and a long-paused instance is
+# eventually deleted (its hostname stops resolving entirely). A trivial daily
+# query resets that idle timer.
+#
+# This talks to Aura directly rather than through /health/detailed, so it keeps
+# working whether or not the backend happens to be deployed and reachable.
+#
+# Required repository secrets:
+#   NEO4J_URI       neo4j+s://<instance>.databases.neo4j.io
+#   NEO4J_USERNAME  usually "neo4j"
+#   NEO4J_PASSWORD
+#   NEO4J_DATABASE  the Aura DB name, which is the instance id, NOT "neo4j"
+#
+# NOTE: GitHub disables scheduled workflows in a repository with no activity for
+# 60 days. If the repo goes quiet, re-enable this from the Actions tab.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # 03:17 UTC daily. Off the hour on purpose: GitHub drops scheduled runs at
+    # popular times when the queue is busy.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  neo4j:
+    name: Neo4j Aura keep-alive
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install driver
+        run: pip install --disable-pip-version-check "neo4j>=6,<7"
+
+      - name: Run keep-alive query
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE }}
+        run: |
+          python - <<'PY'
+          import os, sys, time
+          from neo4j import GraphDatabase
+
+          uri = os.environ.get("NEO4J_URI")
+          user = os.environ.get("NEO4J_USERNAME")
+          password = os.environ.get("NEO4J_PASSWORD")
+          database = os.environ.get("NEO4J_DATABASE")
+
+          missing = [n for n, v in (
+              ("NEO4J_URI", uri),
+              ("NEO4J_USERNAME", user),
+              ("NEO4J_PASSWORD", password),
+              ("NEO4J_DATABASE", database),
+          ) if not v]
+          if missing:
+              sys.exit(f"Missing repository secret(s): {', '.join(missing)}")
+
+          # A resuming instance refuses connections for a while, so retry with
+          # backoff rather than failing the run on the first attempt.
+          last = None
+          for attempt in range(1, 6):
+              try:
+                  with GraphDatabase.driver(uri, auth=(user, password)) as driver:
+                      driver.verify_connectivity()
+                      records, _, _ = driver.execute_query(
+                          "RETURN 1 AS ok", database_=database
+                      )
+                      assert records[0]["ok"] == 1
+                  print(f"Aura reachable on attempt {attempt}; idle timer reset.")
+                  break
+              except Exception as exc:  # noqa: BLE001 - report whatever comes back
+                  last = exc
+                  print(f"attempt {attempt} failed: {exc}")
+                  if attempt < 5:
+                      time.sleep(attempt * 20)
+          else:
+              sys.exit(f"Aura unreachable after 5 attempts: {last}")
+          PY
+
+  # ===========================================================================
+  # Idle-connection recovery — the regression test for the SessionExpired bug.
+  #
+  # Aura closes idle connections within minutes. Before `dependencies.py` gained
+  # `liveness_check_timeout` / `max_connection_lifetime`, the next query on a stale POOLED
+  # connection threw SessionExpired ("defunct connection"), surfacing as intermittent 500s on
+  # every Neo4j-backed endpoint. `run_soak_test.py --idle` covers this, but a 70-minute soak is
+  # not something anyone runs per change, so the failure could return unnoticed.
+  #
+  # This lives here, not in `tests.yml`, on purpose. CI's integration job runs a LOCAL Neo4j
+  # container, which does not close idle connections the way Aura does — the probe would pass
+  # there no matter what the pool settings were, which is worse than not having it. It only
+  # means anything against real Aura, and this is the workflow that already holds those secrets.
+  #
+  # Reads-only (`RETURN 1`), so unlike the integration suite it cannot touch the demo dataset.
+  # It shares the keep-alive's daily schedule because it also resets the idle timer.
+  # ===========================================================================
+  neo4j-idle-recovery:
+    name: Neo4j Aura idle-connection recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install driver
+        run: pip install --disable-pip-version-check "neo4j>=6,<7"
+
+      - name: Query, idle past Aura's window, reuse the same pool
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE }}
+          IDLE_MINUTES: "11"
+        run: |
+          python - <<'PY'
+          import os, sys, time
+          from neo4j import GraphDatabase
+
+          uri, user = os.environ.get("NEO4J_URI"), os.environ.get("NEO4J_USERNAME")
+          password, database = os.environ.get("NEO4J_PASSWORD"), os.environ.get("NEO4J_DATABASE")
+          if not all((uri, user, password, database)):
+              sys.exit("Missing NEO4J_* repository secret(s)")
+
+          idle_s = float(os.environ["IDLE_MINUTES"]) * 60
+
+          # These MUST mirror api/dependencies.py::get_neo4j_driver. A probe with different pool
+          # settings tests a pool the application never uses, and would go green while the real
+          # one regressed. If you change them there, change them here.
+          driver = GraphDatabase.driver(
+              uri,
+              auth=(user, password),
+              liveness_check_timeout=30,
+              max_connection_lifetime=300,
+              connection_acquisition_timeout=60,
+          )
+          try:
+              # Phase 1 failing means Aura is unreachable or the secrets are wrong — a setup
+              # problem, NOT the regression. Reported separately so a red run is not misread as
+              # a pool defect; the catch-all here originally blamed stale connections for an
+              # auth error.
+              try:
+                  records, _, _ = driver.execute_query("RETURN 1 AS ok", database_=database)
+                  assert records[0]["ok"] == 1
+              except Exception as exc:  # noqa: BLE001
+                  sys.exit(
+                      f"SETUP FAILED before the probe ran: {type(exc).__name__}: {exc}\n"
+                      "Aura is unreachable or the NEO4J_* secrets are wrong. This says nothing "
+                      "about connection recovery — the probe never got to test it."
+                  )
+              print("phase 1: query on a warm pool OK")
+
+              # Longer than Aura's idle window AND longer than max_connection_lifetime (300 s),
+              # so the pooled connection is guaranteed stale rather than merely old.
+              print(f"phase 2: idling {idle_s/60:g} min so Aura can close the pooled connection...")
+              time.sleep(idle_s)
+
+              # The regression point. No retry and no fresh driver: reusing THIS pool is the
+              # whole test. Retrying here would paper over exactly the bug being guarded.
+              try:
+                  records, _, _ = driver.execute_query("RETURN 1 AS ok", database_=database)
+                  assert records[0]["ok"] == 1
+              except Exception as exc:  # noqa: BLE001
+                  sys.exit(
+                      f"IDLE RECOVERY FAILED: {type(exc).__name__}: {exc}\n"
+                      "A stale pooled connection was handed out without being replaced — the "
+                      "SessionExpired regression is back. Check liveness_check_timeout / "
+                      "max_connection_lifetime in api/dependencies.py."
+                  )
+              print("phase 3: query on the same pool after idle OK — recovery intact")
+          finally:
+              driver.close()
+          PY

@@ -1,0 +1,66 @@
+name: Frontend CI
+
+# Least-privilege default for all jobs — read-only access to repo contents.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  ci:
+    # One job, one `npm ci` — typecheck → lint → build → audit run as sequential steps.
+    # Fail-fast: the first failing step stops the run (fewer wasted minutes than 4 parallel jobs).
+    name: Typecheck · Lint · Build · Audit
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"   # stub so next build resolves config
+      NEXT_PUBLIC_KAIROS_PHASE: "3"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      # Gate on PRODUCTION dependencies — the code that actually ships to a browser.
+      # `--omit=dev` is the scope change, not a threshold change: high+critical still fails
+      # the build for anything in the shipped bundle.
+      - name: Audit production dependencies (high + critical)
+        run: npm audit --audit-level=high --omit=dev
+
+      # Dev/lint tooling is reported but does not block. Every current finding traces to one
+      # root cause — brace-expansion 1.x under minimatch, cascading through eslint's plugin
+      # tree — and the only remedy npm offers is eslint@10 (semver major). It is a DoS in a
+      # tool run against our own source, with no runtime attack surface, so blocking every
+      # build on it trains people to ignore CI instead of fixing anything. Overriding
+      # brace-expansion to 5.x was tried and breaks ESLint outright: minimatch@3 imports it
+      # expecting the 1.x CommonJS export. Revisit when eslint 10 is adopted deliberately.
+      - name: Audit dev dependencies (report only)
+        continue-on-error: true
+        run: npm audit --audit-level=high

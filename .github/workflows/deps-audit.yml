@@ -1,0 +1,119 @@
+name: Dependency audit
+
+# The per-push dependency check that Dependabot cannot provide.
+#
+# Dependabot version updates are schedule-only (daily at the most) and have no event trigger, so
+# nothing was checking dependencies at the moment they change. Dependabot security updates do open
+# PRs when an advisory lands, but that is reactive and arrives after the merge. This runs on the
+# push and on the PR, so a dependency bump that introduces a known CVE is visible before it lands
+# rather than in an alert afterwards.
+#
+# Scope: known vulnerabilities only. CodeQL covers the code; this covers what the code depends on.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/requirements.txt'
+      - 'backend/connectors/go.mod'
+      - 'backend/connectors/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/deps-audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/requirements.txt'
+      - 'backend/connectors/go.mod'
+      - 'backend/connectors/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/deps-audit.yml'
+  # Lets you re-run against current advisory data without touching a manifest — a dependency does
+  # not have to change for it to become vulnerable.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: pip-audit (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: pip install pip-audit
+      # Audits the pinned manifest rather than a resolved environment: the manifest is what the
+      # image builds from, so that is the thing whose CVEs actually ship.
+      #
+      # BASELINE (measured 2026-08-22): 16 advisories across 4 packages are suppressed below, so
+      # this job gates *new* vulnerabilities rather than being red from day one. A check that can
+      # never go green gets ignored, which is worse than not running it. Every suppression names
+      # what unblocks it; none is "won't fix" except where upstream has no fix at all.
+      #
+      #   ecdsa 0.19.2      — fix_versions is EMPTY: no released fix exists. Arrives via
+      #                       python-jose[cryptography]; the cryptography backend is what actually
+      #                       verifies our ES256 tokens. Re-check when upstream ships a fix.
+      #   starlette 0.37.2  — pinned transitively by fastapi==0.111.1 (>=0.37.2,<0.38.0). Fixes
+      #                       need 0.40.0 through 1.3.1, so this is a FastAPI major upgrade, not a
+      #                       bump. Tracked in docs/implementation/status.md, Backlog #2.
+      #
+      #   CLEARED 2026-08-23 — protobuf and setuptools, in one coupled change:
+      #     setuptools was NOT a stale cap. OTEL 0.45b0's instrumentation imported `pkg_resources`,
+      #     which setuptools 78+ removes, so lifting the cap alone crashed `api.main` on import.
+      #     OTEL >=0.49b0 dropped `pkg_resources` but requires protobuf 5, which `grpcio-tools
+      #     1.62.3` (transitive via qdrant-client) forbade. Pinning `grpcio-tools>=1.66` released
+      #     protobuf to 5.29.6, which unblocked OTEL 1.28.0/0.49b0, which unpinned setuptools.
+      #     qdrant-client and temporalio were NOT upgraded. 16 advisories -> 10.
+      #
+      # No advisories are ignored (re-checked 2026-10-01 after the fastapi, starlette and anyio bumps and
+      # the removal of python-jose). Do not add an --ignore-vuln without a reason on the same line.
+      - name: Audit backend/requirements.txt
+        run: |
+          pip-audit --requirement backend/requirements.txt --strict --progress-spinner off
+
+  node:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # `--audit-level=high` on purpose, and `--omit=dev` for what blocks. The frontend tree carries
+      # transitive advisories in dev-only tooling that never reaches a browser (today: braces, via
+      # eslint-config-next, which has no fixed release); failing the build on those trains people to
+      # ignore a red run, which is worse than not running it. High and critical in what ships block;
+      # the dev tooling is reported (same split as frontend.yml).
+      - name: Audit frontend dependencies (shipped, high and critical)
+        working-directory: frontend
+        run: npm audit --audit-level=high --omit=dev
+
+      - name: Audit frontend dev tooling (report only)
+        working-directory: frontend
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  go:
+    name: govulncheck (OT connector)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+          cache-dependency-path: backend/connectors/go.sum
+      # Pinned, not @latest: x/vuln v1.8.0 requires Go 1.26, and with the toolchain held at the
+      # connector's Go 1.25 the install itself failed — a red audit with nothing scanned. v1.7.0 is
+      # the last release that builds on 1.25. Raise it together with `go-version` above.
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+      # govulncheck is reachability-based: it reports a CVE only when the vulnerable symbol is
+      # actually called, so it does not fail on an advisory in code this binary never executes.
+      - name: Audit Go modules
+        working-directory: backend/connectors
+        run: govulncheck ./...
