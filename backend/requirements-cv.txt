@@ -1,0 +1,26 @@
+# =============================================================================
+# Kairos — Path A computer-vision stack (FUTURE / not installed by default)
+# =============================================================================
+# The Layer 3 P&ID drawing parser currently uses Path B — a cloud vision-language
+# model (NIM meta/llama-3.2-11b-vision-instruct, see api/services/pid.py). That
+# needs no local ML packages and is the default.
+#
+# This file pins the dependencies for Path A: custom-trained YOLOv9 + LayoutLMv3
+# on local GPU (ARCHITECTURE.md Layer 3). It is intentionally NOT referenced by
+# backend/Dockerfile — installing it adds ~1.5 GB and only makes sense on a
+# dedicated GPU-backed drawing-parser service.
+#
+# When Path A is built:
+#   - Give it its OWN service/image (do not bloat the shared API/worker image).
+#   - Install with:  pip install -r requirements.txt -r requirements-cv.txt
+#   - numpy + Pillow already live in requirements.txt (kept for image handling).
+# =============================================================================
+
+torch==2.3.1
+torchvision==0.18.1
+ultralytics==8.2.40
+layoutparser==0.3.4
+opencv-python-headless==4.9.0.80
+scipy==1.13.1
+scikit-learn==1.5.1
+pandas==2.2.2

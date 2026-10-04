@@ -1,0 +1,43 @@
+# =============================================================================
+# Kairos — backend/.dockerignore
+# Build context: ./backend  (used by kairos-backend-api, kairos-celery-worker,
+# kairos-temporal-activity-worker, kairos-elicitation-worker)
+# =============================================================================
+
+# --- Python bytecode & caches ---
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual environments (should never exist here, but guard anyway) ---
+.venv/
+venv/
+env/
+
+# --- Go connector (has its own build context) ---
+connectors/
+
+# --- Secrets ---
+.env
+.env.local
+*.pem
+*.key
+
+# --- IDE / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
+
+# --- Dockerfile itself (not needed inside the image) ---
+Dockerfile
+
+# --- NOTE: tests/ and scripts/ are intentionally NOT excluded ---
+# tests/ runs inside the container: docker exec kairos-backend-api python -m pytest
+# scripts/ (seed_users, seed_regulations, init_neo4j, etc.) run inside the container too

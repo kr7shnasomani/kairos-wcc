@@ -1,0 +1,45 @@
+# Ruff configuration for the Kairos backend.
+#
+# WHY THIS FILE EXISTS
+#   There was no ruff config, so CI ran `ruff check ./backend` with whatever rule set the
+#   latest release happened to enable. That makes linting non-reproducible: the Linting job
+#   went from green (2026-07-22) to 608 errors with no code change, purely because ruff
+#   0.16.0 shipped different defaults. A linter that can fail on an unchanged tree is a CI
+#   defect, not a code-quality signal.
+#
+#   The rule set below is the one this codebase actually conforms to. Pin the action version
+#   in .github/workflows/lint.yml alongside it.
+#
+# ON "UP" (adopted 2026-08-15)
+#   pyupgrade is now selected. The migration it was previously deferred for is done:
+#   UP006/UP035 rewrote 283 `typing.Dict`/`List` annotations to PEP 585 builtins and dropped
+#   48 now-dead `typing` imports; UP045 converted 136 `Optional[X]` to `X | None`; UP017
+#   moved 49 `timezone.utc` uses to `datetime.UTC`. All applied by `ruff --fix` (mechanical,
+#   no hand edits), followed by an F401/I001 pass to clear imports the rewrite orphaned.
+#   Verified on py312 with the service-free suite green. Keeping "UP" selected is what stops
+#   the old spelling creeping back in one file at a time.
+
+target-version = "py312"
+line-length = 120
+
+exclude = [
+    "requirements-cv.txt",
+    "__pycache__",
+]
+
+[lint]
+# E/W pycodestyle · F pyflakes (real bugs: unused/undefined names) · I import order ·
+# UP pyupgrade (PEP 585/604 syntax — see the note above).
+select = ["E", "W", "F", "I", "UP"]
+
+# E501 line-length is reported by the formatter, not worth failing a build over; the
+# codebase has long Cypher strings and prompt literals that read worse wrapped.
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+# Tests and scripts import fixtures and modules for side effects.
+"tests/*" = ["F401", "F811"]
+"scripts/*" = ["E402"]  # sys.path manipulation before imports is deliberate in the seeders
+
+[lint.isort]
+known-first-party = ["api", "workers", "workflows", "scripts"]
