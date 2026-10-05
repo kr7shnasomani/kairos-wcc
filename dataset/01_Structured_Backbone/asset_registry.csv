@@ -1,0 +1,11 @@
+asset_tag,functional_location,description,criticality,equipment_class,oem,install_date,status
+EQ-101,RPC-U2-L1-EQ101,Centrifugal Feed Pump,Critical,Rotating - Centrifugal Pump,Fischer Pumps Ltd.,2010-03-01,Active
+EQ-102,RPC-U2-L2-EQ102,Centrifugal Feed Pump,High,Rotating - Centrifugal Pump,Fischer Pumps Ltd.,2011-06-15,Active
+EQ-103,RPC-U2-L3-EQ103,Centrifugal Feed Pump,High,Rotating - Centrifugal Pump,Fischer Pumps Ltd.,2012-01-20,Active
+V-247,RPC-L3-S2-V247,Manual Isolation Valve,Medium,Valve - Gate,Generic Valve Co.,2009-11-01,Active
+XV-203,RPC-L3-S2-XV203,Primary Isolation Valve,Critical,Valve - Isolation,Generic Valve Co.,2009-11-01,Active
+XV-204,RPC-L3-S2-XV204,Secondary Bleed Valve,Medium,Valve - Isolation,Generic Valve Co.,2023-02-10,Active
+PG-18,RPC-L3-S2-PG18,Local Gauge Bypass,Low-Medium,Instrument - Bypass,Generic Instrumentation Inc.,2009-11-01,Active
+HE-301,RPC-U1-HE301,Shell and Tube Heat Exchanger,High,HE-3xx series,Meridian Heat Transfer Systems,2013-08-01,Active
+HE-302,RPC-U1-HE302,Shell and Tube Heat Exchanger,High,HE-3xx series,Meridian Heat Transfer Systems,2013-08-01,Active
+HE-303,RPC-U1-HE303,Shell and Tube Heat Exchanger,High,HE-3xx series,Meridian Heat Transfer Systems,2014-02-15,Active

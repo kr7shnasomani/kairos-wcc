@@ -1,0 +1,12 @@
+alias,canonical_asset_id,source_context
+P-101,EQ-101,Legacy P&ID nomenclature
+Pump 101,EQ-101,Shift log common usage
+Feed Pump A,EQ-101,Operating procedure nomenclature
+P101,EQ-101,Work order shorthand
+the old Fischer,EQ-101,Informal field reference to OEM brand
+P-102,EQ-102,Legacy P&ID nomenclature
+Pump 102,EQ-102,Shift log common usage
+Feed Pump B,EQ-102,Operating procedure nomenclature
+P-103,EQ-103,Legacy P&ID nomenclature
+Pump 103,EQ-103,Shift log common usage
+Feed Pump C,EQ-103,Operating procedure nomenclature

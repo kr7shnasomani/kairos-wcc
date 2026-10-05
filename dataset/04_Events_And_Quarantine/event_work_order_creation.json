@@ -1,0 +1,22 @@
+{
+  "event_id": "EVT-2026-071501",
+  "event_type": "work_order_created",
+  "source_system": "CMMS",
+  "timestamp": "2026-07-15T05:58:00+05:30",
+  "canonical_asset_id": "EQ-101",
+  "payload": {
+    "work_order_id": "WO-2026-0714",
+    "assigned_technician": "Suresh Yadav",
+    "failure_code": "MECH-SEAL-FAIL",
+    "failure_description": "Mechanical seal failure",
+    "priority": "High",
+    "equipment_criticality": "Critical",
+    "raised_by": "Vikram Desai (Shift Lead)"
+  },
+  "normalization": {
+    "deduplicated": false,
+    "correlated_events": [],
+    "late_arrival_buffered": false,
+    "notes": "Single-source event, no correlation required."
+  }
+}

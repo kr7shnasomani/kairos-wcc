@@ -1,0 +1,114 @@
+{
+  "drawing_id": "P-2301",
+  "title": "Feed Section P&ID - Pump P-101",
+  "revision": "Rev-4",
+  "equipment_nodes": [
+    {
+      "id": "TOPO-EQ-001",
+      "tag": "P-101",
+      "type": "centrifugal_pump",
+      "service": "Feed Pump A",
+      "design_pressure_kpa": 800,
+      "design_temp_c": 80,
+      "equipment_class": "pump"
+    },
+    {
+      "id": "TOPO-EQ-002",
+      "tag": "TK-201",
+      "type": "storage_tank",
+      "service": "Feed Tank",
+      "design_pressure_kpa": 150,
+      "design_temp_c": 60,
+      "equipment_class": "vessel"
+    },
+    {
+      "id": "TOPO-EQ-003",
+      "tag": "HX-301",
+      "type": "heat_exchanger",
+      "service": "Feed Pre-heater",
+      "design_pressure_kpa": 600,
+      "design_temp_c": 120,
+      "equipment_class": "heat_exchanger"
+    },
+    {
+      "id": "TOPO-EQ-004",
+      "tag": "FT-3047",
+      "type": "flow_transmitter",
+      "service": "Pump Discharge Flow",
+      "loop": "FIC-3047",
+      "equipment_class": "instrument"
+    },
+    {
+      "id": "TOPO-EQ-005",
+      "tag": "PG-18",
+      "type": "pressure_gauge",
+      "service": "Bypass Pressure Gauge",
+      "range_kpa": "0-1000",
+      "equipment_class": "instrument",
+      "deviation_note": "Field observation 2025-03-12: device may not be seating fully"
+    }
+  ],
+  "isolation_valves": [
+    {
+      "id": "TOPO-VLV-001",
+      "tag": "XV-203",
+      "type": "gate_valve",
+      "service": "P-101 Suction Isolation",
+      "normally_open": true,
+      "last_inspected": "2024-06-15",
+      "inspection_interval_months": 18
+    },
+    {
+      "id": "TOPO-VLV-002",
+      "tag": "XV-204",
+      "type": "globe_valve",
+      "service": "Discharge Secondary Bleed",
+      "normally_closed": true,
+      "last_inspected": "2025-01-10",
+      "inspection_interval_months": 18
+    },
+    {
+      "id": "TOPO-VLV-003",
+      "tag": "PCV-301",
+      "type": "pressure_control_valve",
+      "service": "Discharge Pressure Control",
+      "set_point_kpa": 550,
+      "normally_open": true,
+      "last_inspected": "2024-11-20",
+      "inspection_interval_months": 12
+    }
+  ],
+  "instrumentation_loops": [
+    {
+      "id": "TOPO-LOOP-001",
+      "loop_id": "FIC-3047",
+      "type": "flow_control",
+      "instruments": ["FT-3047", "FIC-3047", "FV-3047"],
+      "design_range_m3h": "0-120",
+      "alarm_high_m3h": 110,
+      "alarm_low_m3h": 5
+    },
+    {
+      "id": "TOPO-LOOP-002",
+      "loop_id": "PIC-101",
+      "type": "pressure_indication",
+      "instruments": ["PT-101A", "PT-101B", "PIC-101"],
+      "design_range_kpa": "0-1000",
+      "alarm_high_kpa": 780,
+      "alarm_low_kpa": 50
+    }
+  ],
+  "isolation_boundaries": [
+    {
+      "id": "TOPO-ISO-001",
+      "boundary_id": "ISO-P101-MAINT",
+      "description": "P-101 Full Maintenance Isolation Boundary",
+      "primary_isolations": ["XV-203", "XV-204"],
+      "bleed_vents": ["PG-18"],
+      "requires_double_block_bleed": true,
+      "ptw_type": "mechanical",
+      "regulatory_ref": "OISD-117-6.2",
+      "requires_engineer_signoff": true
+    }
+  ]
+}

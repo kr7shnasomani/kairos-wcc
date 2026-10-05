@@ -1,0 +1,21 @@
+{
+  "event_id": "EVT-2026-032201",
+  "event_type": "recurring_failure_detected",
+  "source_system": "CMMS",
+  "timestamp": "2026-03-22T09:15:00+05:30",
+  "canonical_asset_id": "EQ-102",
+  "payload": {
+    "new_work_order_id": "WO-2026-0245",
+    "prior_work_order_id": "WO-2026-0203",
+    "days_since_prior_open": 20,
+    "days_since_prior_closure": 18,
+    "prior_failure_code": "MECH-SEAL-FAIL",
+    "new_failure_code": "ELEC-INSUL-FAIL",
+    "failure_code_family_match": false
+  },
+  "attribution_guidance": {
+    "classification": "counterfactual",
+    "reasoning": "New failure is in a different failure-mode family (electrical insulation vs. mechanical seal). Per Layer 10 attribution logic, this does NOT trigger a confidence adjustment on the prior seal-replacement recommendation, even though it falls within the 30-day recurrence window.",
+    "confidence_adjustment_applied": false
+  }
+}

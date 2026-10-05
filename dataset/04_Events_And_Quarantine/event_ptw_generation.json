@@ -1,0 +1,23 @@
+{
+  "event_id": "EVT-2026-071502",
+  "event_type": "ptw_generated",
+  "source_system": "PTW_WORKFLOW",
+  "timestamp": "2026-07-15T05:40:00+05:30",
+  "canonical_asset_id": "V-247",
+  "payload": {
+    "ptw_id": "PTW-2026-0714",
+    "permit_type": "Cold Work / Isolation",
+    "work_location": "Production Line 3, Section 2",
+    "work_description": "Isolation for replacement of Valve V-247",
+    "issuing_engineer": "Rohit Menon",
+    "isolation_boundary": ["XV-203", "XV-204", "PG-18"],
+    "valid_from": "2026-07-15T06:00:00+05:30",
+    "valid_to": "2026-07-15T18:00:00+05:30"
+  },
+  "normalization": {
+    "deduplicated": false,
+    "correlated_events": [],
+    "late_arrival_buffered": false,
+    "notes": "No corresponding DCS tag-out event modeled in this dataset; single-source event for MVP demo."
+  }
+}

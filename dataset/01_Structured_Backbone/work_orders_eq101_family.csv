@@ -1,0 +1,10 @@
+work_order_id,asset_tag,date_opened,date_closed,status,failure_code,failure_description,root_cause,part_number_used,technician,notes
+WO-2018-0412,EQ-101,2018-07-15,2018-07-18,Closed,MECH-SEAL-FAIL,Mechanical seal failure,General wear,FSL-2240A,Suresh Yadav,Seal repacked; no OEM bulletin in effect at this time
+WO-2019-0206,EQ-102,2019-03-10,2019-03-12,Closed,MECH-SEAL-FAIL,Mechanical seal failure,Not investigated,FSL-2240A,,Sister asset failure #1
+WO-2021-0887,EQ-101,2021-09-22,2021-09-25,Closed,MECH-SEAL-FAIL,Mechanical seal failure,Thermal cycling identified retrospectively,FSL-2240A,Suresh Yadav,Post-incident review noted thermal cycling contribution
+WO-2022-0518,EQ-102,2022-06-14,2022-06-16,Closed,MECH-SEAL-FAIL,Mechanical seal failure,Not investigated,FSL-2240A,,Sister asset failure #2
+WO-2023-0349,EQ-103,2023-04-02,2023-04-04,Closed,MECH-SEAL-FAIL,Mechanical seal failure,Not investigated,FSL-2240A,,Sister asset failure #3
+WO-2025-0631,EQ-101,2025-05-15,2025-05-18,Closed,MECH-SEAL-FAIL,Mechanical seal failure,Thermal cycling; pre-failure signature confirmed,FSL-2240A,Suresh Yadav,OEM bulletin FP-SB-2025-04 issued 4 months earlier had not reached maintenance stores; old part number used in repair
+WO-2026-0203,EQ-102,2026-03-02,2026-03-04,Closed,MECH-SEAL-FAIL,Mechanical seal failure,Preventive replacement,FSL-2240B,,Routine seal replacement using correct updated part number
+WO-2026-0245,EQ-102,2026-03-22,2026-03-24,Closed,ELEC-INSUL-FAIL,Electrical insulation fault,Insulation degradation - unrelated to seal,N/A,,Occurred 20 days after WO-2026-0203 open date (18 days after closure); different failure family - counterfactual case; should not reduce confidence in prior seal recommendation
+WO-2026-0714,EQ-101,2026-07-15,,Open,MECH-SEAL-FAIL,Mechanical seal failure,Pending investigation,Pending,Suresh Yadav,Demo trigger - live telemetry shows thermal cycling matching WO-2025-0631 signature

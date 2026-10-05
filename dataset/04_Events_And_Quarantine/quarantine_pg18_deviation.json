@@ -1,0 +1,18 @@
+{
+  "quarantine_id": "QI-2026-0624-PG18-DEV",
+  "status": "quarantined",
+  "verification_status": "unreviewed",
+  "source_type": "field_deviation_flag",
+  "linked_asset": "PG-18",
+  "logged_by": "Suresh Yadav",
+  "date_logged": "2026-06-24",
+  "content_text_original": "PG-18 bypass gauge -- noticed slight moisture around the fitting during rounds today. Not sure if this is normal seepage or the gauge is not seating fully. Did not raise formal deviation yet, will keep an eye next shift.",
+  "content_translation_en": null,
+  "source_artifacts": [
+    "handwritten_inspection_note.png",
+    "shift_log.txt"
+  ],
+  "assigned_reviewer": "Ananya Iyer",
+  "linked_context": "Surfaced in PTW-2026-0714 isolation boundary brief as an unverified deviation flag on PG-18, one of three devices in the isolation boundary for the V-247 replacement.",
+  "promotion_history": []
+}

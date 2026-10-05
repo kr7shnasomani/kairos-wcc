@@ -1,0 +1,17 @@
+{
+  "quarantine_id": "QI-2026-0114-EQ101-VIB",
+  "status": "quarantined",
+  "verification_status": "unreviewed",
+  "source_type": "field_observation",
+  "linked_asset": "EQ-101",
+  "logged_by": "Suresh Yadav",
+  "date_logged": "2026-01-15",
+  "content_text_original": "EQ-101 pump sounded a bit different tonight, felt somewhat more vibration than usual. Checked the gauge and it was within normal range so I didn't formally log it. Just noting it here in case it happens again.",
+  "source_artifacts": [
+    "handwritten_shift_log.png",
+    "shift_log.txt"
+  ],
+  "assigned_reviewer": "Ananya Iyer",
+  "linked_context": "Surfaced in the Flow A proactive brief for WO-2026-0714 as an unformally investigated observation preceding the current failure pattern on EQ-101.",
+  "promotion_history": []
+}

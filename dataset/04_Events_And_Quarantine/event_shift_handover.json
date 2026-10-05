@@ -1,0 +1,17 @@
+{
+  "event_id": "EVT-2026-071503",
+  "event_type": "shift_handover",
+  "source_system": "SHIFT_SCHEDULING",
+  "timestamp": "2026-07-15T18:00:00+05:30",
+  "canonical_asset_id": null,
+  "payload": {
+    "outgoing_shift": "Day Shift - 15-Jul-2026",
+    "incoming_shift": "Night Shift - 15-Jul-2026",
+    "outgoing_shift_lead": "Vikram Desai",
+    "open_work_orders": ["WO-2026-0714"],
+    "active_permits": ["PTW-2026-0714"],
+    "pending_quarantine_reviews": ["QI-2026-0114-EQ101-VIB", "QI-2026-0624-PG18-DEV"],
+    "pending_moc": ["MOC-2026-0601-HE3XX-PRESSURE"],
+    "anomaly_summary": "EQ-101 live telemetry shows a thermal cycling pattern matching the signature that preceded the May-2025 seal failure (WO-2025-0631). Recommend incoming shift monitor closely pending WO-2026-0714 resolution."
+  }
+}
