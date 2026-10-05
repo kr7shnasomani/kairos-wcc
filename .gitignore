@@ -144,4 +144,4 @@ logs/
 # Benchmark run logs + checkpoints
 backend/.benchmark_runs/
 
-# .vercel is tracked — project.json holds deploy config (no secrets)
+.vercel

@@ -1,0 +1,655 @@
+# Deploying the Kairos backend on AWS
+
+This guide hosts **everything except the frontend** on one EC2 instance in **Mumbai (`ap-south-1`)**, so
+the public can use Kairos. The frontend is deployed separately on Vercel and calls this server over HTTPS.
+
+```
+Browser ──► https://kairos-deterium.vercel.app          Vercel: Next.js frontend
+   │
+   └──────► https://kairos-deterium.duckdns.org          EC2: Caddy :443 ──► FastAPI :8000
+                 ├─ Celery · Temporal + Postgres · Temporal activity and elicitation workers · Go connector
+                 ├─ Elasticsearch · Redis · OPA                    (local to the host, never exposed)
+                 └─ Supabase · Neo4j Aura · Qdrant Cloud · Grafana Cloud · NVIDIA NIM · Jina · Groq   (cloud)
+```
+
+This guide uses the project's DuckDNS name, `kairos-deterium.duckdns.org`. If you use a different name, replace it everywhere below.
+
+**Files this guide uses (all in this repository):**
+
+| File | Purpose |
+|---|---|
+| [`docker-compose.yml`](../docker-compose.yml) | The stack. The `kairos-caddy` service (profile `prod`) is the HTTPS front for the API and only runs on the server. |
+| [`infra/caddy/Caddyfile`](../infra/caddy/Caddyfile) | Caddy config: automatic HTTPS, a 30 MB request body cap and security headers, proxies to `kairos-backend-api:8000` |
+| [`db/snapshots/kairos-es-data.tar.gz`](../db/snapshots/) | Snapshot of the local Elasticsearch index for the golden dataset |
+
+`docker-compose.override.yml` is for **local development only**. It is never copied to or used on the server.
+
+## Current deployment (updated 2 October 2026)
+
+| | |
+|---|---|
+| Frontend | **https://kairos-deterium.vercel.app** · Vercel project `kairos` (team `kr1shnasomani-preview`), root `frontend`, Vercel Authentication **off** |
+| API | **https://kairos-deterium.duckdns.org** (`/health`, `/docs`, `/health/detailed` needs a sign-in) |
+| Server | EC2 `i-012800d81f549557b` · `c7i-flex.large` (resized down from `m7i-flex.large` on 28 September 2026, see §2) · Ubuntu 24.04 · 30 GB gp3 · Mumbai `ap-south-1` |
+| Address | Elastic IP `3.7.186.159` ← DuckDNS `kairos-deterium` |
+| Security group | 22 (one IP: the deployer's current address), 80, 443 |
+| Certificate | Let's Encrypt, renewed automatically by Caddy |
+| Code | the working tree as of 2 October 2026 (security update, role migration applied, `MOC_WEBHOOK_SECRET` and `CONNECTOR_SHARED_SECRET` set). `make sync-check` compares it with local, GitHub and Vercel (section 14b) |
+| Running | the 11 services started by `make prod`; memory about 2.1 GiB of 3.7 GiB. Elasticsearch runs the 512 MB heap (`-Xms512m -Xmx512m`) |
+| Account | AWS Free plan, $200 credit ($100 sign-up + $100 in activity credits), about $2.28 a day while running (down from $2.63/day on the old instance type) |
+| Runway | **$167.64** left as of 28 September 2026 ÷ $2.28/day = about 74 days. Credit runs out around **10 December 2026** |
+
+**The demo button.** The login page's "Explore the live demo" button signs in as `demo@kairos.local`
+(role `demo`: sees everything, every destructive action refused by policy). Its credentials are public by
+design (`NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD`, baked into the frontend at build time).
+**Still open:** the other seeded accounts' old passwords are in git history, so rotate them (see
+`docs/implementation/status.md`).
+
+---
+
+## Contents
+
+1. [Concepts in one minute](#1-concepts-in-one-minute)
+2. [Sizing and cost](#2-sizing-and-cost)
+3. [Before you start](#3-before-you-start)
+4. [Stop surprise charges](#4-stop-surprise-charges)
+5. [Get an HTTPS name with DuckDNS](#5-get-an-https-name-with-duckdns)
+6. [Launch the EC2 instance](#6-launch-the-ec2-instance)
+7. [Prepare the server](#7-prepare-the-server)
+8. [Copy the code and secrets](#8-copy-the-code-and-secrets)
+9. [Production `.env`](#9-production-env)
+10. [Start the backend](#10-start-the-backend)
+11. [Verify](#11-verify)
+12. [Connect the Vercel frontend](#12-connect-the-vercel-frontend)
+13. [Never run on the server](#13-never-run-on-the-server)
+14. [Operate: update, logs, stop, tear down](#14-operate-update-logs-stop-tear-down)
+    - [14b. Staying in sync (local, GitHub, EC2, Vercel)](#14b-staying-in-sync-local-github-ec2-vercel)
+15. [Troubleshooting](#15-troubleshooting)
+16. [Continuous deploy (GitHub Actions)](#16-continuous-deploy-github-actions)
+
+---
+
+## 1. Concepts in one minute
+
+| Piece | What it does |
+|---|---|
+| **EC2 instance** | The virtual server that runs the Docker stack |
+| **Elastic IP** | A fixed public IP, so the address survives a stop and start |
+| **DuckDNS** | A free domain name (`kairos-deterium.duckdns.org`) that points at the Elastic IP |
+| **Caddy** | A small web server on the instance. It gets a free Let's Encrypt certificate and forwards HTTPS traffic to FastAPI. |
+| **Vercel** | Hosts the Next.js frontend. Browsers block an HTTPS page from calling a plain-HTTP API, which is why the API needs Caddy and a domain. |
+
+**Why Elasticsearch stays on the same host.** Measured on production, Elasticsearch uses about 894 MiB
+(512 MB heap — capped 2026-09-28 after it was found using 1.44 GiB on a 1 GB default heap regardless of actual
+data volume, see §2) and holds about 140 KB of data. It fits comfortably on the current 4 GiB host, with room
+to grow to roughly hundreds of thousands of documents at this size before the heap becomes the constraint —
+this project's golden dataset (under 150 documents) is nowhere near that.
+
+Hosting it elsewhere would cost more and add a network hop to every search, because Elastic Cloud has no
+free tier. Leaving it out is possible: the backend starts without it, and search falls back to Qdrant and
+the graph. But that loses four things:
+
+- exact tag and part-number matches
+- asset search
+- the Elasticsearch indexing step of document ingestion
+- the conditions under which the benchmark figures were measured
+
+---
+
+## 2. Sizing and cost
+
+Prices are AWS on-demand rates for **Asia Pacific (Mumbai)**, checked on 14 September 2026, re-checked against the
+AWS Price List API on 22 September 2026, and re-checked again on 28 September 2026 after downsizing the Free-plan
+instance (below). A month is 730 hours.
+
+| Item | Rate | t4g.large (Paid plan) | c7i-flex.large (Free plan) |
+|---|---|---|---|
+| Instance, 2 vCPU / 8 GiB (paid) or 4 GiB (free) | per hour | $0.0448 → **$32.70/mo** | $0.0848 → **$61.90/mo** |
+| 30 GB gp3 disk | $0.0912 / GB-month | $2.74/mo | $2.74/mo |
+| 1 public IPv4 (Elastic IP) | $0.005 / hour | $3.65/mo | $3.65/mo |
+| **Total** | | **$39.09/mo · $1.29/day** | **$68.29/mo · $2.28/day** |
+| Days $100 of credit lasts | | about 78 | about 44 |
+| Days $200 of credit lasts | | about 156 | about 88 |
+
+Free-plan instance history: `m7i-flex.large` (8 GiB, $79.93/mo · $2.63/day) until 28 September 2026, then resized
+to `c7i-flex.large` (4 GiB) once the Elasticsearch heap fix below made the smaller box safe — about 15% cheaper.
+
+**Other costs:**
+- **Data transfer out:** the first 100 GB per month is free, and API responses are kilobytes.
+- **Model calls** (NVIDIA NIM, Jina, Groq) are billed by those providers, not AWS.
+
+**Memory — measured directly on the production instance** (`free -m` + `docker stats`, not a dev machine; see the
+pitfall below on why that distinction matters), under a real concurrent load test (10 concurrent requests against
+`/health/detailed`, which touches Neo4j, Qdrant, Elasticsearch, Redis and Temporal, for 30s), 2026-09-28:
+
+| Service | Memory (peak) |
+|---|---|
+| Elasticsearch | 894 MiB (heap capped at 512 MB, down from a 1 GB default that let it drift toward its 2 GiB container ceiling regardless of actual data volume) |
+| Backend API | 239 MiB |
+| Temporal | 211 MiB |
+| Celery | 211 MiB |
+| Elicitation worker | 130 MiB |
+| Temporal Postgres | 121 MiB |
+| Temporal activity worker | 57 MiB |
+| Caddy | 49 MiB |
+| OPA | 33 MiB |
+| Go connector | 17 MiB |
+| Redis | 13 MiB |
+| **Sum of containers** | **about 1.93 GiB** |
+| **Real OS-level peak used** (`free -m`, includes Docker/OS overhead) | **about 2.37 GiB** |
+
+- **Do not measure this stack's memory on a dev machine with more CPU cores than the target instance.** Celery
+  defaults its worker concurrency to `os.cpu_count()`; an 8-core laptop spawns 8 worker processes where the 2-vCPU
+  EC2 box spawns 2. An earlier pass here reported "Celery: 721 MiB" from a laptop measurement — the real,
+  production-measured number is 211 MiB. Always measure on the actual target instance for sizing decisions.
+- **`c7i-flex.large` (4 GiB, ~3.7 GiB usable) is the validated, live instance for the Free plan** — about 1.33 GiB
+  / 36% headroom above the measured 2.37 GiB peak. Previously this doc ruled out a 4 GiB host; that guidance was
+  correct for the old uncapped Elasticsearch heap and is superseded by the fix above.
+- **A 2 GiB instance (`t3.small`/`t4g.small`) does not fit — tested and rejected 2026-09-28.** The measured 2.37 GiB
+  peak already exceeds a 2 GiB box before accounting for real search/ingestion traffic (this test only hit health
+  endpoints). Splitting the smaller services (Redis, OPA, Go connector, Caddy — combined under 20% of the total) to
+  another host doesn't help either: even removing all of them leaves the AWS side around 1.95 GiB, still over 2 GiB,
+  while adding cross-network latency to things that need to be fast (auth checks on every request, Celery's broker,
+  Temporal's own database) or can't run on serverless/free-tier platforms at all (Temporal's activity worker, the
+  Celery/elicitation queue consumers — these are persistent background processes, not request-response HTTP apps).
+  Reaching 2 GiB would require removing real functionality (Temporal or elicitation), not right-sizing. Don't
+  re-investigate this without new evidence that changes the above.
+- **CPU:** the idle stack uses about 4% of 2 vCPUs, well under the 30% baseline of a t4g.large.
+
+---
+
+## 3. Before you start
+
+**Pick the instance by account plan.** Check which plan you're on at
+**https://console.aws.amazon.com/billing/home#/freetier**.
+
+- **Free plan → `c7i-flex.large` (x86_64), 4 GiB.**
+  - Free-plan accounts can launch only these types: `t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`,
+    `c7i-flex.large` and `m7i-flex.large`. `c7i-flex.large` is the smallest of these that fits this stack,
+    now that the Elasticsearch heap fix in §2 caps its growth — validated by a production load test at ~2.37 GiB
+    real peak against 4 GiB (a 2 GiB type does not fit; see §2). (Before the heap fix, only `m7i-flex.large`'s
+    8 GiB was safe — see §2's history note.)
+  - The Free plan cannot charge your card.
+  - The account closes when credits run out or after 6 months, unless you upgrade.
+- **Paid plan → `t4g.large` (Graviton, arm64), 8 GiB.** It costs half as much as the old 8 GiB Free-plan option.
+  - Credits pay for it, but once they run out your card is charged. The budget in section 4 is the guard.
+  - Every image in the stack publishes an arm64 build, and the backend and connector images build on arm64.
+  - Not yet re-verified whether a smaller Paid-plan type (e.g. `t4g.medium`) is now safe with the heap fix —
+    size it the same way (§2's load test) before switching.
+
+**Check your credits and their expiry dates** at **https://console.aws.amazon.com/billing/home#/credits**.
+
+**You need:**
+- An AWS account with credits
+- A GitHub account (to sign in to DuckDNS)
+- A Vercel account (for the frontend)
+- This repository with a working `.env` on your Mac
+
+**Decide before going public: the demo login.** The login page has a
+**"Explore the live demo"** button (signs in as admin).
+
+- **The risk:** on a public deployment, any visitor becomes admin. They can sign permits, promote quarantined
+  items and supersede documents in the real Supabase, Neo4j Aura and Qdrant data, and that data has no backup.
+- **Recommended:** point the button at a read-mostly persona, and share admin credentials privately.
+
+---
+
+## 4. Stop surprise charges
+
+Do this before launching anything. Go to **https://console.aws.amazon.com/costmanagement/home#/budgets**.
+
+In **Advanced options → Charge types**, a ticked **Credits** box means credits are subtracted, so the budget
+tracks what you would actually pay. Unticking it tracks usage before credits, which is how fast credits burn.
+
+**Budget 1: credit burn (everyone).**
+
+1. Choose **Create budget**, then **Customize (advanced)**, then **Cost budget**.
+2. Set the details:
+   - **Name:** `credit-burn-50usd`
+   - **Period:** Monthly
+   - **Budget renewal type:** Recurring
+   - **Budgeting method:** Fixed
+   - **Amount:** `50.00`
+3. Under **Budget scope**, keep **All AWS services**, open **Advanced options** and **untick Credits**.
+4. Add email alerts at **Actual 80%** and **Forecasted 100%**.
+
+**Budget 2: real charges reach $1 (Paid plan only).**
+
+Skip this on the Free plan, which cannot charge your card. On the Paid plan, create a second cost budget named
+`real-charges-1usd`: monthly, amount `1.00`, **leave Credits ticked**, alerts at **Actual 50%** and **Actual 100%**.
+
+The first two budgets on an account are free.
+
+---
+
+## 5. Get an HTTPS name with DuckDNS
+
+1. Open **https://www.duckdns.org** and sign in with GitHub.
+2. Under **sub domain**, enter a name (this project uses `kairos-deterium`) and click **add domain**.
+3. Leave **current ip** empty for now. You fill it in during step 6.
+
+**Why not a Cloudflare quick tunnel?** Quick tunnels do not support Server-Sent Events, so the Copilot answer
+stream would break. DuckDNS with Caddy is free, needs no purchased domain, and supports streaming.
+
+---
+
+## 6. Launch the EC2 instance
+
+Open **https://ap-south-1.console.aws.amazon.com/ec2/home?region=ap-south-1#LaunchInstances:**. Confirm the
+region at the top right reads **Asia Pacific (Mumbai)**.
+
+| Field | Value |
+|---|---|
+| Name | `kairos-backend` |
+| AMI | **Ubuntu Server 24.04 LTS**: **64-bit (Arm)** for t4g.large, **64-bit (x86)** for c7i-flex.large |
+| Instance type | `t4g.large` (Paid plan) or `c7i-flex.large` (Free plan) |
+| Key pair | **Create new key pair**: name `kairos-aws`, type ED25519, format `.pem` |
+| Network settings → Edit | Auto-assign public IP: **Enable** |
+| Security group | Create `kairos-backend-sg` with the rules below |
+
+**Note:** the EC2 launch wizard may ignore a typed security-group name and create it as `launch-wizard-1`
+instead (observed 2026-09-27). If `kairos-backend-sg` isn't listed under **Security Groups**, look for
+`launch-wizard-1` created the same day as the instance — that's the one attached to it.
+| Configure storage | **30 GiB**, **gp3** |
+| Advanced details → Credit specification (t4g only) | Leave **Unlimited** for the first build; switch it in [section 10](#10-start-the-backend) |
+
+**Security group inbound rules.** Add nothing else. Never open 8000, 9200, 6379, 7233 or 8181.
+
+| Type | Port | Source | Why |
+|---|---|---|---|
+| SSH | 22 | **My IP** | Your access only |
+| HTTP | 80 | `0.0.0.0/0` | Let's Encrypt validation, then a redirect to HTTPS |
+| HTTPS | 443 | `0.0.0.0/0` | The API |
+
+Launch the instance, then:
+
+1. **Allocate a fixed IP.**
+   - Open **https://ap-south-1.console.aws.amazon.com/ec2/home?region=ap-south-1#Addresses:**.
+   - Click **Allocate Elastic IP address**, then **Allocate**.
+   - Choose **Actions → Associate Elastic IP address**, pick instance `kairos-backend`, and associate.
+2. **Point DuckDNS at it.** On DuckDNS, paste the Elastic IP into **current ip** and click **update ip**.
+3. **Store the key on your Mac:**
+
+```bash
+mv ~/Downloads/kairos-aws.pem ~/.ssh/ && chmod 400 ~/.ssh/kairos-aws.pem
+```
+
+4. **Confirm the name resolves.** This must print the Elastic IP:
+
+```bash
+dig +short kairos-deterium.duckdns.org
+```
+
+5. **Connect:**
+
+```bash
+ssh -i ~/.ssh/kairos-aws.pem ubuntu@kairos-deterium.duckdns.org
+```
+
+---
+
+## 7. Prepare the server
+
+Run on the server:
+
+```bash
+sudo apt-get update && sudo apt-get -y upgrade
+sudo apt-get install -y make                         # needed for `make prod`
+curl -fsSL https://get.docker.com | sudo sh          # Docker's official install script (Engine + Compose v2)
+sudo usermod -aG docker ubuntu
+
+# 2 GiB swap as a safety net
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Elasticsearch memory-map limit, and keep it out of swap
+printf 'vm.max_map_count=262144\nvm.swappiness=10\n' | sudo tee /etc/sysctl.d/99-kairos.conf
+sudo sysctl --system
+
+exit   # log out and back in so the docker group applies
+```
+
+**Why `vm.max_map_count`.**
+- Ubuntu defaults to 65,530, and Elasticsearch asks for 262,144.
+- With `discovery.type: single-node`, Elasticsearch treats the node as development mode, so the failed check is
+  only logged and it still starts.
+- It can still fail later under load when it runs out of memory maps. Setting the value costs nothing.
+
+---
+
+## 8. Copy the code and secrets
+
+Run on your Mac. This copies the repository without the frontend, git history, the dev override or local
+tooling folders. It goes over SSH, so no GitHub token is needed.
+
+**First time only** (copies your `.env` too, which section 9 then switches to production):
+
+```bash
+rsync -az --delete --exclude '.git' --exclude 'frontend' --exclude 'node_modules' --exclude '__pycache__' --exclude '.pytest_cache' --exclude '.ruff_cache' --exclude '.claude' --exclude '.agents' --exclude 'docker-compose.override.yml' -e "ssh -i ~/.ssh/kairos-aws.pem" /Users/apple/Documents/Projects/kairos/ ubuntu@kairos-deterium.duckdns.org:~/kairos/
+```
+
+**Every update after that** (never touches the server's `.env` or its backups):
+
+```bash
+rsync -az --delete --exclude '.git' --exclude 'frontend' --exclude 'node_modules' --exclude '__pycache__' --exclude '.pytest_cache' --exclude '.ruff_cache' --exclude '.claude' --exclude '.agents' --exclude 'docker-compose.override.yml' --exclude '.env' --exclude '.env.bak.*' -e "ssh -i ~/.ssh/kairos-aws.pem" /Users/apple/Documents/Projects/kairos/ ubuntu@kairos-deterium.duckdns.org:~/kairos/
+```
+
+**About `.env`:**
+- The first-time copy sends your development `.env`; the update copy excludes it. Re-running the first-time
+  command on a live server would replace its production settings with your development ones.
+- It holds cloud credentials, so it lives only on your Mac and this server.
+- It is listed in `.gitignore`. Never commit it.
+
+---
+
+## 9. Production `.env`
+
+On the server:
+
+```bash
+cd ~/kairos
+openssl rand -hex 32   # run four times: APP_SECRET_KEY, INTERNAL_API_KEY, CONNECTOR_SHARED_SECRET, MOC_WEBHOOK_SECRET
+nano .env
+```
+
+Set or add these lines:
+
+```
+APP_ENV=production
+APP_DEBUG=false
+APP_SECRET_KEY=<first random value>
+INTERNAL_API_KEY=<second random value>
+CONNECTOR_SHARED_SECRET=<third random value>
+MOC_WEBHOOK_SECRET=<fourth random value>
+CORS_ORIGINS=["http://localhost:3000"]
+RATE_LIMIT_PER_MINUTE=600
+KAIROS_DOMAIN=kairos-deterium.duckdns.org
+```
+
+| Setting | Why |
+|---|---|
+| `APP_ENV=production` | Turns on the production guardrails in `api/config.py`. **`development` is the only `APP_ENV` that enables dev bypasses** (the unauthenticated mock user, OPA pass-through, no rate limit, default keys); the value is trimmed and lower-cased, and any other value (`production`, `staging`, a typo) is treated as non-development. The API refuses to start with a default `INTERNAL_API_KEY` or `APP_SECRET_KEY`, an empty `SUPABASE_JWT_SECRET`, an unset `MOC_WEBHOOK_SECRET`, or `APP_DEBUG=true`. |
+| `INTERNAL_API_KEY` | The default value grants admin. The Go connector reads the same `.env`, so it picks up the new key. |
+| `CONNECTOR_SHARED_SECRET` | **Required.** Every Go connector route except `/health` demands it in `X-Connector-Secret`; the API and the attribution worker send it from the same `.env`. The connector refuses to start without it, and, outside `APP_ENV=development`, with the dev default (or the default `INTERNAL_API_KEY`). |
+| `MOC_WEBHOOK_SECRET` | **Required.** Boot refuses without it. The plant's MoC system must sign each webhook (`X-Webhook-Timestamp` and `X-Webhook-Signature`, HMAC-SHA256 over `"{timestamp}." + raw body`, 5-minute window; `API.md` § `POST /governance/moc/webhook`). |
+| `CORS_ORIGINS` | A placeholder until section 12. It must be a JSON list. |
+| `RATE_LIMIT_PER_MINUTE=600` | The limit is enforced whenever `APP_ENV` is not `development` and applies per client IP. Vercel server-side renders reach the API from a few shared IPs, so the default 120 is too tight. 600 still stops a script from draining model quotas. |
+| `KAIROS_DOMAIN` | Read by the `kairos-caddy` service for the certificate |
+
+Leave every other value unchanged. To turn on Nebius Token Factory later, follow
+[`BACKEND.md` › Turning on Nebius Token Factory](./BACKEND.md#turning-on-nebius-token-factory).
+
+---
+
+## 10. Start the backend
+
+On the server:
+
+**On a fresh server, restore the search index first.** A new Elasticsearch volume is empty, so asset search
+and exact-match retrieval return nothing without the snapshot. Restoring before the first start means
+Elasticsearch never needs a restart. This writes only to this server's local Elasticsearch, never to
+Supabase, Neo4j or Qdrant.
+
+```bash
+cd ~/kairos
+docker volume create --label com.docker.compose.project=kairos --label com.docker.compose.volume=kairos-elasticsearch_data kairos_kairos-elasticsearch_data
+docker run --rm -v kairos_kairos-elasticsearch_data:/data -v "$PWD/db/snapshots":/backup alpine sh -c "rm -rf /data/* && tar xzf /backup/kairos-es-data.tar.gz -C /data && chown -R 1000:0 /data"
+```
+
+**Then build and start everything:**
+
+```bash
+cd ~/kairos && make prod
+```
+
+`make prod` builds the backend and connector images, then starts the 11 backend services and `kairos-caddy`.
+It is the same as:
+
+```bash
+docker compose -f docker-compose.yml --profile prod build kairos-backend-api kairos-backend-go
+docker compose -f docker-compose.yml --profile prod up -d kairos-elasticsearch kairos-redis kairos-opa kairos-temporal-postgres kairos-temporal kairos-backend-api kairos-celery-worker kairos-temporal-activity-worker kairos-elicitation-worker kairos-backend-go kairos-caddy
+```
+
+- **Always use `make prod`, or pass `-f docker-compose.yml --profile prod` and name the services.**
+  - A plain `docker compose up` loads the dev override, which publishes Elasticsearch, Redis and Temporal ports.
+  - A bare `up` or `build` also tries to build the frontend, which is not on the server.
+- **The first build took about 3 minutes** on the m7i-flex.large.
+
+To restore the snapshot on a server that is already running, stop Elasticsearch first
+(`docker compose -f docker-compose.yml --profile prod stop kairos-elasticsearch`), run the `docker run` line
+above, then `make prod`.
+
+**t4g.large only, after the build:**
+1. In EC2, select the instance and choose **Actions → Instance settings → Change credit specification**.
+2. Untick **Unlimited** and save.
+
+The idle stack sits far below the 30% CPU baseline, so this removes a possible extra charge without slowing anything.
+
+---
+
+## 11. Verify
+
+On the server:
+
+```bash
+docker compose -f docker-compose.yml --profile prod ps
+free -h
+```
+
+- Every service should report `healthy` or `running`.
+- `free -h` should show about 2.5 to 3 GiB used.
+
+From your Mac:
+
+```bash
+curl -s https://kairos-deterium.duckdns.org/health
+```
+
+It should return JSON over a valid certificate. `/health/detailed` now needs a signed-in user's `Authorization: Bearer` token, so a bare `curl` gets `401`; `/health`, `/docs` and `/openapi.json` stay public. The deploy workflow therefore checks `/health`.
+
+Check the proxy hardening (headers from `infra/caddy/Caddyfile`):
+
+```bash
+curl -sI https://kairos-deterium.duckdns.org/health/ | grep -iE "strict-transport|x-frame|x-content-type|referrer|^server"
+```
+
+You should see `Strict-Transport-Security`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and no `Server` header. Caddy also caps request bodies at 30 MB (`request_body { max_size 30MB }`; the API's own upload limit is `MAX_UPLOAD_MB`, 25, and the extra headroom covers multipart framing), so an oversized upload is refused at the proxy before it is spooled to disk. Neither the headers nor the cap buffer the Copilot answer stream.
+
+In a browser, open **https://kairos-deterium.duckdns.org/docs**. You should see Swagger UI with a padlock in the address bar.
+
+Check that redirects stay on HTTPS:
+
+```bash
+curl -sI "https://kairos-deterium.duckdns.org/search?q=x" | grep -i location
+```
+
+The `location` must start with `https://`. If it says `http://`, the API container is running without
+`--forwarded-allow-ips "*"` (set in `backend/Dockerfile`'s `CMD`), so FastAPI's trailing-slash redirects downgrade to
+HTTP and the browser blocks them: the Copilot shows "Failed to fetch". The flag is baked into the image, so
+rebuild, not just recreate: `docker compose -f docker-compose.yml --profile prod up -d --build kairos-backend-api`.
+
+---
+
+## 12. Connect the Vercel frontend
+
+The Vercel project `kairos` already exists and is linked to `kr7shnasomani/kairos` with **Root Directory**
+`frontend`; every push to `main` deploys. For a new project, import the repository at
+**https://vercel.com/new** and set the root directory to `frontend`. The public `/docs` section is built from the repository's `docs/` folder (`../docs` from the root directory), so keep **Include source files outside of the Root Directory in the Build Step** enabled (Project Settings, General); `tools/deploy_frontend.sh` uploads the whole repository, so a CLI deploy has it either way.
+
+**1. Environment variables (Production):**
+
+| Name | Value |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | `https://kairos-deterium.duckdns.org` |
+| `API_INTERNAL_URL` | `https://kairos-deterium.duckdns.org` |
+| `NEXT_PUBLIC_AUTH_STRICT` | `true` |
+
+Set them in **Settings → Environment Variables**, or from `frontend/` with the Vercel CLI:
+
+```bash
+export VERCEL_ORG_ID=team_CV55a739gesEJLo0ydqxhrwZ VERCEL_PROJECT_ID=prj_4XwxHOCZDI4Ioir6XEj4pubr3zhC
+printf '%s' 'https://kairos-deterium.duckdns.org' | vercel env add NEXT_PUBLIC_API_URL production
+printf '%s' 'https://kairos-deterium.duckdns.org' | vercel env add API_INTERNAL_URL production
+printf '%s' 'true' | vercel env add NEXT_PUBLIC_AUTH_STRICT production
+```
+
+**2. Rebuild.** `NEXT_PUBLIC_*` values are baked in at build time, so changing them needs a new build: in the
+dashboard, **Deployments → ⋯ → Redeploy**, or `vercel redeploy <deployment-url> --target production`.
+Without them the build silently falls back to `http://localhost:8000`.
+
+**3. Allow the frontend origin on the server** and recreate the API:
+
+```bash
+cd ~/kairos && sed -i 's#^CORS_ORIGINS=.*#CORS_ORIGINS=["https://kairos-deterium.vercel.app"]#' .env
+docker compose -f docker-compose.yml --profile prod up -d --force-recreate kairos-backend-api
+```
+
+If you add a custom domain on Vercel, add it to the same JSON list.
+
+**4. Public access.** Vercel Authentication is on by default, so visitors who are not signed in to your Vercel
+team see a login screen. For a public site, go to **Settings → Deployment Protection → Vercel Authentication**
+and choose **Only Preview Deployments** (production public, previews private). The CLI command
+`vercel project protection disable kairos --sso` turns it off for previews as well; that is how it is set now.
+
+---
+
+## 13. Never run on the server
+
+The server is connected to the **real cloud stores that hold the golden dataset**. These write to them or delete
+from them (see the 🛑 rule in `CLAUDE.md`):
+
+- `make seed`, `make load-dataset`, `make init-all`, `make purge-test-data`, `make nuke`
+- the write scripts in `backend/scripts/`
+- the full `pytest tests/` suite, whose session teardown purges cloud data
+
+---
+
+## 14. Operate: update, logs, stop, tear down
+
+**Update the code.** Run the **update** rsync from section 8 (the one that excludes `.env`), then on the server:
+
+```bash
+cd ~/kairos && make prod
+```
+
+**Logs:**
+
+```bash
+docker compose -f docker-compose.yml --profile prod logs -f --tail 100 kairos-backend-api
+```
+
+### Pause when idle (stop and start)
+
+**Stop:** EC2 → Instances → select `kairos-backend` → **Instance state → Stop instance**.
+
+- **What keeps billing while stopped:** the disk ($2.74/mo) and the Elastic IP ($3.65/mo), about
+  **$6.39 a month, or $0.21 a day**. The instance charge ($2.42 a day) stops.
+- **What survives:** the disk, the code, `.env`, the Elasticsearch index, the certificate, and the address.
+  DuckDNS and the Vercel frontend need no changes.
+- **While it is stopped** the Vercel site still loads, but every page shows "backend unreachable".
+
+**Start:** **Instance state → Start instance**, wait about 2 minutes, then check:
+
+```bash
+curl -s https://kairos-deterium.duckdns.org/health/
+```
+
+Docker starts at boot and every container restarts on its own (`restart: unless-stopped`), so nothing needs
+to be run. If SSH is refused, your home IP has probably changed: edit the security group's SSH rule and choose
+**My IP** again.
+
+**Before starting again after a long pause, check:**
+
+1. **AWS plan window.** The Free plan ends 6 months after the account was created, or when the credit runs out,
+   whichever comes first. Check the date on the Billing home page.
+2. **Supabase.** Free projects pause after a period of inactivity. If it shows as paused, restore it from the
+   Supabase dashboard before starting the server.
+3. **Neo4j Aura.** Free instances pause after 3 days idle; `.github/workflows/uptime.yml` queries it daily.
+   GitHub disables scheduled workflows after 60 days without repository activity, so re-enable it from the
+   Actions tab if needed.
+4. **Qdrant Cloud.** Confirm the cluster is running in the Qdrant console.
+
+**Cheaper for long gaps:** create a snapshot of the volume, terminate the instance and release the Elastic IP.
+The snapshot bills only the used data (about 11 GB), well under $1 a month. Restoring means launching a new
+instance from that snapshot, attaching a new Elastic IP, and updating DuckDNS with the new address.
+
+**Tear down to $0:**
+1. Terminate the instance.
+2. Release the Elastic IP.
+3. Confirm **https://ap-south-1.console.aws.amazon.com/ec2/home?region=ap-south-1#Volumes:** is empty.
+4. Check **https://console.aws.amazon.com/ec2globalview/home** for leftovers in other regions.
+
+---
+
+## 14b. Staying in sync (local, GitHub, EC2, Vercel)
+
+The same working tree should be what runs everywhere. Four commands keep it that way:
+
+| Command | What it does |
+|---|---|
+| `make sync-check` | Read-only. Reports drift between this tree, GitHub, the EC2 backend, the Vercel frontend and your local containers. `tools/sync_check.sh --deep` also logs in as the demo user on the live API. Exit status 1 if anything differs. |
+| `make deploy-backend` | Backs up the server tree and tags the running images, rsyncs (never touches the server's `.env`), runs `make prod`, restarts OPA and Caddy, verifies `/health`. `tools/deploy_backend.sh --files` copies files only (docs, tools, compose) with no rebuild or restart. |
+| `make deploy-frontend` | `vercel deploy --prod` from the repo root with a remote build, no GitHub push, then records the deployed source hash in `.vercel/deployed-frontend.sha`. |
+| `make local-refresh` | Rebuilds the local images from the working tree, recreates the containers and restarts OPA. |
+
+What `sync-check` compares: uncommitted files and unpushed commits; a checksum dry run of the deploy rsync; the frontend source hash against the last deploy; thirteen behaviour flags resolved with their code defaults on both sides; that OPA and Caddy started after their files last changed (both only read them at startup, and a single-file mount goes stale after an rsync); and that each local image is newer than its source.
+
+**Differences that are intentional, and so not reported as drift:**
+
+| | Local | Hosted |
+|---|---|---|
+| API address the browser calls | `http://localhost:8000` | `https://kairos-deterium.duckdns.org` |
+| `APP_ENV` | `development` (dev bypasses on) | `production` (they are off) |
+| `CORS_ORIGINS` | the local origins | the Vercel origin |
+| Frontend process | `next dev` (dev stage, runtime env) | production build (values baked at build time) |
+| Secrets | your local values | the server's own (`MOC_WEBHOOK_SECRET`, `CONNECTOR_SHARED_SECRET`, cloud keys) |
+| Backend source | mounted with `--reload` (`docker-compose.override.yml`) | rsynced and rebuilt |
+
+Everything else, including `NEXT_PUBLIC_AUTH_STRICT` and the demo login, should match. Vercel's variable values are encrypted and cannot be read back, so `sync-check` only verifies that the names exist: change a `NEXT_PUBLIC_*` value there and run `make deploy-frontend`.
+
+## 15. Troubleshooting
+
+| Symptom | Likely cause and fix |
+|---|---|
+| API container exits at start with a settings error | Production guardrail. Set a non-default `APP_SECRET_KEY` and `INTERNAL_API_KEY`, a non-empty `SUPABASE_JWT_SECRET` and `MOC_WEBHOOK_SECRET`, and `APP_DEBUG=false`. |
+| `kairos-backend-go` exits at start with "refusing to start" | `CONNECTOR_SHARED_SECRET` is unset, or it (or `INTERNAL_API_KEY`) is still the dev default while `APP_ENV` is not `development`. |
+| After a deploy every user is `field_worker` and gets `403`s | `scripts/migrate_roles_to_app_metadata.py --apply` was not run before the code that reads roles from `app_metadata` only. Run it (dry run first); it is additive. |
+| `https://…/health` fails, but `curl localhost:8000/health` works on the server | Ports 80 or 443 are not open in the security group, or DuckDNS does not point at the Elastic IP (`dig +short`). Check `docker logs kairos-caddy` for certificate errors. |
+| Browser shows a CORS error from the Vercel site | The Vercel origin is missing from `CORS_ORIGINS`, or the API was not recreated after editing `.env`. |
+| Asset search and exact-match results are empty | The Elasticsearch snapshot was not restored (section 10). |
+| Elasticsearch restarts or is killed | Check `free -h` and `dmesg | tail`. Confirm swap is on and `vm.max_map_count` is 262144. |
+| Copilot answers arrive all at once instead of streaming | Something is buffering Server-Sent Events. Keep `infra/caddy/Caddyfile` without an `encode` block. |
+| Many `429` responses during a demo | Raise `RATE_LIMIT_PER_MINUTE` in `.env`, then recreate `kairos-backend-api`. |
+| `ssh` to the server hangs and times out (not "refused") | Your current IP isn't the one on the security group's SSH rule — this can happen any time your IP changes, not only after a stop/start. HTTPS still works because 80/443 stay open to everyone; only 22 is IP-locked. Fix: EC2 console → Security Groups → the group attached to the instance (may be named `launch-wizard-1`, not `kairos-backend-sg` — see section 6) → Inbound rules → edit the SSH rule → source **My IP** → Save. |
+
+---
+
+## 16. Continuous deploy (GitHub Actions)
+
+`.github/workflows/deploy-ec2.yml` automates the manual update in section 14: on every push to `main`
+that touches `backend/**`, it rsyncs the repo to the server (excluding `.env`) and runs `make prod`.
+
+**It is currently a no-op by design.** The workflow's first step checks for three repo secrets; if any
+are missing, it logs a notice and every later step is skipped — the job still shows green, it just did
+nothing. This was a deliberate choice (2026-09-27): no deploy credentials exist anywhere until someone
+explicitly adds them.
+
+**To turn it on**, add these under **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `AWS_EC2_HOST` | `kairos-deterium.duckdns.org` |
+| `AWS_EC2_USER` | `ubuntu` |
+| `AWS_EC2_SSH_KEY` | Private half of a **dedicated** deploy keypair — do not reuse `kairos-aws.pem`. Generate one (`ssh-keygen -t ed25519 -f deploy_key -N ""`), append `deploy_key.pub` to the server's `~/.ssh/authorized_keys`, put `deploy_key`'s contents in this secret, then delete the local copies. |
+
+**Also required:** the security group's SSH rule has to allow `0.0.0.0/0`, not just "My IP" — GitHub's
+hosted runners have no fixed IP to allow-list. Access is still gated by the private key (password auth is
+off by default on the Ubuntu AMI), which is why a dedicated, revocable key matters here: if the secret
+ever leaks, remove that one line from `authorized_keys` rather than rotating your own access.
+
+**Optional fourth secret, `AWS_EC2_KNOWN_HOSTS`:** the server's pinned host key, the output of `ssh-keyscan -H <host>`. Set, ssh and rsync use `StrictHostKeyChecking yes` and refuse any other key. Unset, the workflow still runs but logs a warning and trusts the key on first sight (`ssh-keyscan` at run time), which lets a network attacker impersonate the server.
+
+The last step, **Verify the API is up**, runs `curl -sf --max-time 15 https://<AWS_EC2_HOST>/health` after `make prod`, so a deploy that leaves the API down turns the run red. The workflow also needs the server `.env` to already hold the two new required secrets (section 9), because it never copies `.env`.
+
+Once the three secrets exist and the security group is updated, the workflow deploys for real and its
+status (green/red) reflects whether the deploy succeeded — no other change needed. Third-party actions in this and the other workflows are pinned to a commit SHA (with the version in a comment) rather than a moving tag.

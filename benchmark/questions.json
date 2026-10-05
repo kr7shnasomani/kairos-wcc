@@ -1,0 +1,815 @@
+{
+  "_comment": "Kairos domain-expert benchmark. Facts grounded in dataset/00_Reference/00_KAIROS_CANON.md. Grading is fully deterministic (no LLM judge). Fields: 'category' groups questions for per-category scoring; 'expect_any' = retrieval signal (did the fact reach the synthesis context?); answer correctness uses, in order, 'must_all' (every token, non-negated — exact/multi-part facts), else 'answer_any' (any token — comparative answers), else 'expect_any'. A required fact wrapped in a negator ('not 16.2') does not count. Every non-refused answer must also cite sources[]. Run with run_benchmark.py.",
+  "questions": [
+    {
+      "id": "Q01",
+      "category": "current-fact",
+      "question": "What mechanical seal part number should be used for pump EQ-101?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "FSL-2240B"
+      ],
+      "must_all": [
+        "FSL-2240B"
+      ],
+      "expected": "FSL-2240B (revised from FSL-2240A by Fischer bulletin FP-SB-2025-04)."
+    },
+    {
+      "id": "Q02",
+      "category": "causal",
+      "question": "What failure mode precedes mechanical seal failures on EQ-101?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "thermal cycling",
+        "thermal"
+      ],
+      "expected": "Thermal cycling precedes the mechanical seal failures."
+    },
+    {
+      "id": "Q03",
+      "category": "traceability",
+      "question": "Which OEM bulletin revised the seal part number for the feed pumps?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "FP-SB-2025-04",
+        "Fischer"
+      ],
+      "must_all": [
+        "FP-SB-2025-04"
+      ],
+      "expected": "Fischer bulletin FP-SB-2025-04 revised the seal part number."
+    },
+    {
+      "id": "Q04",
+      "category": "temporal-supersession",
+      "question": "What is the current maximum operating pressure for heat exchanger HE-301?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "16.2"
+      ],
+      "must_all": [
+        "16.2"
+      ],
+      "expected": "16.2 bar (revised down from 18.5 bar by bulletin MHT-PB-2026-11)."
+    },
+    {
+      "id": "Q05",
+      "category": "current-fact",
+      "question": "Which OEM manufactures the HE-3xx heat exchangers?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Meridian"
+      ],
+      "must_all": [
+        "Meridian"
+      ],
+      "expected": "Meridian Heat Transfer Systems."
+    },
+    {
+      "id": "Q06",
+      "category": "temporal",
+      "question": "When was isolation valve XV-203 last inspected and what is its inspection interval?",
+      "asset_id": "XV-203",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "12-May-2025",
+        "May 2025",
+        "18",
+        "Nov 2026"
+      ],
+      "expected": "Last inspected 12-May-2025, on an 18-month interval (next due 12-Nov-2026)."
+    },
+    {
+      "id": "Q07",
+      "category": "safety-isolation",
+      "question": "Which valves make up the isolation boundary for V-247 maintenance work?",
+      "asset_id": "V-247",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "XV-203",
+        "XV-204",
+        "PG-18"
+      ],
+      "must_all": [
+        "XV-203",
+        "XV-204",
+        "PG-18"
+      ],
+      "expected": "The isolation boundary includes XV-203, XV-204 and PG-18."
+    },
+    {
+      "id": "Q08",
+      "category": "alias-resolution",
+      "question": "What are the known aliases for pump EQ-101?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search",
+        "aliases"
+      ],
+      "expect_any": [
+        "P-101",
+        "the old Fischer",
+        "Feed Pump A"
+      ],
+      "expected": "Aliases include P-101, Pump 101, Feed Pump A, P101, and 'the old Fischer'."
+    },
+    {
+      "id": "Q09",
+      "category": "aggregation",
+      "question": "How many mechanical seal failures has EQ-101 experienced?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "seal",
+        "failure",
+        "2018",
+        "2021",
+        "2025"
+      ],
+      "answer_any": [
+        "2018",
+        "2021",
+        "2025",
+        "three",
+        "multiple"
+      ],
+      "expected": "Multiple mechanical seal failures (2018, 2021, and 2025)."
+    },
+    {
+      "id": "Q10",
+      "category": "counterfactual",
+      "question": "Was the EQ-102 electrical insulation fault the same failure family as its earlier seal failures?",
+      "asset_id": "EQ-102",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "electrical",
+        "insulation",
+        "different"
+      ],
+      "answer_any": [
+        "different",
+        "unrelated",
+        "separate",
+        "not the same",
+        "counterfactual",
+        "distinct"
+      ],
+      "expected": "No — the electrical insulation fault is a different failure family from the seal failures."
+    },
+    {
+      "id": "Q11",
+      "category": "blast-radius",
+      "question": "Which site operating procedures reference the superseded 18.5 bar pressure limit?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "SOP-HE",
+        "18.5",
+        "procedure"
+      ],
+      "must_all": [
+        "18.5"
+      ],
+      "expected": "The HE-301/302/303 SOPs reference the superseded 18.5 bar limit."
+    },
+    {
+      "id": "Q12",
+      "category": "regulatory",
+      "question": "What regulatory standards apply to this petrochemical facility?",
+      "asset_id": null,
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "OISD",
+        "PESO",
+        "Factories Act"
+      ],
+      "expected": "OISD standards, PESO Rules, and the Factories Act apply."
+    },
+    {
+      "id": "Q13",
+      "category": "temporal-history",
+      "question": "What seal part number was used for EQ-101 before the Fischer bulletin was issued?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "FSL-2240A"
+      ],
+      "must_all": [
+        "FSL-2240A"
+      ],
+      "expected": "FSL-2240A, the part number before bulletin FP-SB-2025-04 revised it to FSL-2240B."
+    },
+    {
+      "id": "Q14",
+      "category": "traceability",
+      "question": "In the May 2025 EQ-101 seal repair, was the updated part number used?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "FSL-2240A",
+        "old",
+        "not reached",
+        "stores"
+      ],
+      "answer_any": [
+        "FSL-2240A",
+        "old part",
+        "not",
+        "no",
+        "superseded"
+      ],
+      "expected": "No — the old part number FSL-2240A was used because the bulletin had not reached maintenance stores."
+    },
+    {
+      "id": "Q15",
+      "category": "personnel",
+      "question": "Which field technician is associated with the EQ-101 seal work orders?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Suresh Yadav",
+        "Suresh"
+      ],
+      "must_all": [
+        "Suresh"
+      ],
+      "expected": "Suresh Yadav, Field Technician, Production Unit 2."
+    },
+    {
+      "id": "Q16",
+      "category": "current-fact",
+      "question": "Which OEM manufactures the feed pumps at the facility?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Fischer"
+      ],
+      "must_all": [
+        "Fischer"
+      ],
+      "expected": "Fischer Pumps Ltd."
+    },
+    {
+      "id": "Q17",
+      "category": "supersession",
+      "question": "Which earlier bulletin did the Meridian pressure bulletin MHT-PB-2026-11 supersede?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "MHT-PB-2022-07",
+        "2022-07"
+      ],
+      "must_all": [
+        "2022-07"
+      ],
+      "expected": "It supersedes MHT-PB-2022-07."
+    },
+    {
+      "id": "Q18",
+      "category": "mdm",
+      "question": "What equipment class does asset EQ-101 belong to?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "centrifugal",
+        "pump",
+        "rotating"
+      ],
+      "answer_any": [
+        "centrifugal",
+        "pump",
+        "rotating"
+      ],
+      "expected": "A rotating centrifugal feed pump."
+    },
+    {
+      "id": "Q19",
+      "category": "safety-isolation",
+      "question": "Which valve is the primary safety isolation valve on Production Line 3?",
+      "asset_id": "XV-203",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "XV-203"
+      ],
+      "must_all": [
+        "XV-203"
+      ],
+      "expected": "XV-203, the primary isolation valve."
+    },
+    {
+      "id": "Q20",
+      "category": "alias-resolution",
+      "question": "What are the known aliases for pump EQ-102?",
+      "asset_id": "EQ-102",
+      "context_sources": [
+        "search",
+        "aliases"
+      ],
+      "expect_any": [
+        "P-102",
+        "Pump 102",
+        "Feed Pump B"
+      ],
+      "answer_any": [
+        "P-102",
+        "Pump 102",
+        "Feed Pump B"
+      ],
+      "expected": "Aliases include P-102, Pump 102, and Feed Pump B."
+    },
+    {
+      "id": "Q21",
+      "category": "temporal-supersession",
+      "question": "What was the maximum operating pressure for HE-301 before the 2026 revision?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "18.5"
+      ],
+      "must_all": [
+        "18.5"
+      ],
+      "expected": "18.5 bar, before MHT-PB-2026-11 revised it down to 16.2 bar."
+    },
+    {
+      "id": "Q22",
+      "category": "counterfactual",
+      "question": "Does the EQ-102 electrical fault reduce confidence in the prior seal replacement recommendation?",
+      "asset_id": "EQ-102",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "counterfactual",
+        "confidence",
+        "different",
+        "not"
+      ],
+      "answer_any": [
+        "no",
+        "not",
+        "different",
+        "counterfactual",
+        "unrelated"
+      ],
+      "expected": "No — it is a different failure family (counterfactual), so no confidence penalty applies."
+    },
+    {
+      "id": "Q23",
+      "category": "regulatory",
+      "question": "Which OISD standard is referenced for the facility's inspection requirements?",
+      "asset_id": null,
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "OISD-STD-128",
+        "OISD-STD-105",
+        "OISD-STD-134",
+        "OISD"
+      ],
+      "answer_any": [
+        "OISD-STD-128",
+        "OISD-STD-105",
+        "OISD-STD-134",
+        "OISD"
+      ],
+      "expected": "OISD-STD-128 (also OISD-STD-105 / 134 in the compiled reference)."
+    },
+    {
+      "id": "Q24",
+      "category": "traceability",
+      "question": "Which work order documents the EQ-102 electrical insulation fault?",
+      "asset_id": "EQ-102",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "WO-2026-0245",
+        "2026-0245"
+      ],
+      "must_all": [
+        "2026-0245"
+      ],
+      "expected": "WO-2026-0245."
+    },
+    {
+      "id": "Q25",
+      "category": "current-fact",
+      "question": "What is the maximum operating pressure engineers should currently use for HE-302 and HE-303?",
+      "asset_id": "HE-302",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "16.2"
+      ],
+      "must_all": [
+        "16.2"
+      ],
+      "expected": "16.2 bar — the revised HE-3xx limit applies to the whole series."
+    },
+    {
+      "id": "Q26",
+      "category": "causal",
+      "question": "What condition preceded the mechanical seal failure on EQ-101 in May 2025?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "vibration",
+        "bearing housing temperature",
+        "thermal cycling"
+      ],
+      "expected": "Rising vibration and bearing housing temperature over ~30 days preceded the failure."
+    },
+    {
+      "id": "Q27",
+      "category": "temporal",
+      "question": "When is the next scheduled review of SOP-HE-GEN-11 due?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "2027-09-01",
+        "2027"
+      ],
+      "must_all": [
+        "2027"
+      ],
+      "expected": "Next review due 2027-09-01."
+    },
+    {
+      "id": "Q28",
+      "category": "aggregation",
+      "question": "How many heat exchangers make up the HE-3xx series?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "three",
+        "3",
+        "HE-301, HE-302, HE-303"
+      ],
+      "expected": "Three — HE-301, HE-302 and HE-303."
+    },
+    {
+      "id": "Q29",
+      "category": "blast-radius",
+      "question": "Which site procedures are affected by the MHT-PB-2026-11 revision?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "SOP-HE-GEN-11",
+        "MP-HE-HYDROTEST-03",
+        "hydrotest"
+      ],
+      "expected": "SOP-HE-GEN-11 and MP-HE-HYDROTEST-03 both reference the superseded figure."
+    },
+    {
+      "id": "Q30",
+      "category": "temporal-history",
+      "question": "What was the calculated hydrotest pressure for the HE-3xx series before the 2026 revision?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "20.35"
+      ],
+      "must_all": [
+        "20.35"
+      ],
+      "expected": "20.35 bar (110% of the 18.5 bar reference then on file)."
+    },
+    {
+      "id": "Q31",
+      "category": "personnel",
+      "question": "Who reviewed and signed off the EQ-101 work order closeout?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Ananya Iyer",
+        "Ananya"
+      ],
+      "must_all": [
+        "Ananya"
+      ],
+      "expected": "Ananya Iyer, Reliability Engineer."
+    },
+    {
+      "id": "Q32",
+      "category": "personnel",
+      "question": "Who is the issuing engineer on permit PTW-2026-0714?",
+      "asset_id": "V-247",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Rohit Menon",
+        "Rohit"
+      ],
+      "must_all": [
+        "Rohit"
+      ],
+      "expected": "Rohit Menon."
+    },
+    {
+      "id": "Q33",
+      "category": "supersession",
+      "question": "Which seal part number superseded FSL-2240A?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "FSL-2240B"
+      ],
+      "must_all": [
+        "FSL-2240B"
+      ],
+      "expected": "FSL-2240B."
+    },
+    {
+      "id": "Q34",
+      "category": "mdm",
+      "question": "What equipment class does HE-301 belong to?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search",
+        "knowledge"
+      ],
+      "expect_any": [
+        "heat exchanger",
+        "shell-and-tube",
+        "exchanger"
+      ],
+      "expected": "Shell-and-tube heat exchanger."
+    },
+    {
+      "id": "Q35",
+      "category": "traceability",
+      "question": "Which document defines the hydrostatic test procedure for the HE-3xx series?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "MP-HE-HYDROTEST-03",
+        "hydrotest"
+      ],
+      "must_all": [
+        "MP-HE-HYDROTEST-03"
+      ],
+      "expected": "MP-HE-HYDROTEST-03."
+    },
+    {
+      "id": "Q36",
+      "category": "current-fact",
+      "question": "What failure code was recorded for the EQ-101 May 2025 work order?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "MECH-SEAL-FAIL"
+      ],
+      "must_all": [
+        "MECH-SEAL-FAIL"
+      ],
+      "expected": "MECH-SEAL-FAIL."
+    },
+    {
+      "id": "Q37",
+      "category": "current-fact",
+      "question": "What is the normal operating pressure range for the HE-3xx series?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "12 - 16",
+        "12-16",
+        "12 to 16"
+      ],
+      "expected": "12 - 16 bar."
+    },
+    {
+      "id": "Q38",
+      "category": "personnel",
+      "question": "Who co-signed permit PTW-2026-0714 as shift lead?",
+      "asset_id": "V-247",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Vikram"
+      ],
+      "must_all": [
+        "Vikram"
+      ],
+      "expected": "Vikram Desai, Shift Lead, co-signed PTW-2026-0714."
+    },
+    {
+      "id": "Q39",
+      "category": "temporal",
+      "question": "When is isolation valve XV-203 next due for inspection?",
+      "asset_id": "XV-203",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "2026",
+        "Nov"
+      ],
+      "answer_any": [
+        "12-Nov-2026",
+        "November 2026",
+        "Nov 2026",
+        "2026-11-12",
+        "12 November 2026",
+        "Nov-2026"
+      ],
+      "expected": "12-Nov-2026 (18-month interval after the 12-May-2025 inspection)."
+    },
+    {
+      "id": "Q40",
+      "category": "causal",
+      "question": "What improvement does seal part FSL-2240B have over FSL-2240A?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "thermal"
+      ],
+      "must_all": [
+        "thermal"
+      ],
+      "expected": "Improved thermal cycling tolerance."
+    },
+    {
+      "id": "Q41",
+      "category": "personnel",
+      "question": "Who reported unusual vibration on EQ-101 in January 2026?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "Suresh"
+      ],
+      "must_all": [
+        "Suresh"
+      ],
+      "expected": "Suresh Yadav, field technician (unverified shift log note, 15-Jan-2026)."
+    },
+    {
+      "id": "Q42",
+      "category": "temporal",
+      "question": "When did Meridian issue the HE-3xx pressure revision bulletin?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "2026"
+      ],
+      "answer_any": [
+        "1-Jun-2026",
+        "June 2026",
+        "Jun 2026",
+        "2026-06-01",
+        "1 June 2026",
+        "June 1, 2026"
+      ],
+      "expected": "1-Jun-2026 (MHT-PB-2026-11)."
+    },
+    {
+      "id": "Q43",
+      "category": "alias-resolution",
+      "question": "Which asset do technicians call \"the old Fischer\"?",
+      "asset_id": "EQ-101",
+      "context_sources": [
+        "search",
+        "aliases"
+      ],
+      "expect_any": [
+        "EQ-101",
+        "old Fischer"
+      ],
+      "must_all": [
+        "EQ-101"
+      ],
+      "expected": "EQ-101, the Line 1 centrifugal feed pump."
+    },
+    {
+      "id": "Q44",
+      "category": "traceability",
+      "question": "At what percentage of operating pressure is the HE-3xx hydrotest performed?",
+      "asset_id": "HE-301",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "110"
+      ],
+      "must_all": [
+        "110"
+      ],
+      "expected": "110% of the maximum operating pressure (MP-HE-HYDROTEST-03)."
+    },
+    {
+      "id": "Q45",
+      "category": "safety-isolation",
+      "question": "What concern was raised about PG-18 in June 2026?",
+      "asset_id": "PG-18",
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "seat",
+        "moisture"
+      ],
+      "answer_any": [
+        "seat",
+        "moisture"
+      ],
+      "expected": "PG-18 may not be seating fully (unverified field note, 24-Jun-2026)."
+    },
+    {
+      "id": "Q46",
+      "category": "regulatory",
+      "question": "Which Petroleum and Explosives Safety Organisation rules are cited for the facility?",
+      "asset_id": null,
+      "context_sources": [
+        "search"
+      ],
+      "expect_any": [
+        "PESO"
+      ],
+      "must_all": [
+        "PESO"
+      ],
+      "expected": "PESO Rules 2016."
+    }
+  ]
+}

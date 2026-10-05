@@ -1,0 +1,112 @@
+{
+  "_comment": [
+    "STAGED — copy to benchmark/brief_expectations.json after SOAK_DONE.",
+    "Ground truth for proactive-brief quality (Layer 8). Grading is the same deterministic",
+    "must_all / answer_any contract as questions.json, applied to the assembled brief text",
+    "rather than a synthesized answer.",
+    "",
+    "CALIBRATION REQUIRED ON FIRST RUN. Every token below is drawn from the golden corpus",
+    "(asset tags, part numbers, isolation devices that appear in dataset/), but whether a given",
+    "brief ASSEMBLES that fact depends on what the engine actually queries. Run once with",
+    "--report-only, then demote any expectation the engine legitimately does not carry to",
+    "`should_contain` (reported, not graded). Do NOT delete a failing expectation just to get a",
+    "green number — that is grading the system against its own output."
+  ],
+  "cases": [
+    {
+      "id": "B01",
+      "trigger": "work_order_created",
+      "rationale": "Architecture Flow A. A technician about to open EQ-101 must be told the seal part number was superseded — fitting the old variant is the failure this brief exists to prevent.",
+      "event": {
+        "work_order_id": "WO-BENCH-001",
+        "asset_id": "EQ-101",
+        "failure_code": "SEAL_LEAK",
+        "description": "Mechanical seal leak on drive end",
+        "site_id": "RJG",
+        "source_system": "sap_pm"
+      },
+      "must_all": ["EQ-101"],
+      "should_contain": ["FSL-2240B", "seal"],
+      "must_cite_sources": true
+    },
+    {
+      "id": "B02",
+      "trigger": "work_order_created",
+      "rationale": "Recurrence context. EQ-101 has prior seal history in the corpus; a brief that omits it sends the technician in blind to a repeat failure.",
+      "event": {
+        "work_order_id": "WO-BENCH-002",
+        "asset_id": "EQ-101",
+        "failure_code": "SEAL_LEAK",
+        "description": "Repeat seal failure",
+        "site_id": "RJG",
+        "source_system": "sap_pm"
+      },
+      "should_contain": ["histor", "prior", "previous"],
+      "must_cite_sources": true
+    },
+    {
+      "id": "B03",
+      "trigger": "ptw_generated",
+      "rationale": "Architecture Flow B. The isolation boundary for V-247 is the safety payload — a PTW brief missing an isolation device is actively dangerous.",
+      "event": {
+        "ptw_id": "PTW-BENCH-001",
+        "work_area": "Production Line 3, Section 2",
+        "asset_ids": ["V-247"],
+        "ptw_type": "isolation",
+        "issuing_engineer_id": "bench-engineer",
+        "site_id": "RJG",
+        "source_system": "ptw_system"
+      },
+      "should_contain": ["XV-203", "XV-204", "PG-18"],
+      "known_unmet": "2026-08-17: unmet, and it is a DATA state not a code defect. Flow B sources isolation points from engineer-verified P&ID topology; the graph holds 4 topology elements (1 verified), so the engine correctly carries none. Verifying the drawings should make this pass — do not delete the expectation to go green.",
+      "must_be_critical": true,
+      "must_require_countersignature": true
+    },
+    {
+      "id": "B04",
+      "trigger": "ptw_generated",
+      "rationale": "PG-18 carries a quarantined field observation. A PTW brief must surface it AND label it unverified — the architecture forbids rendering quarantined input as canonical.",
+      "event": {
+        "ptw_id": "PTW-BENCH-002",
+        "work_area": "Production Line 3, Section 2",
+        "asset_ids": ["V-247"],
+        "ptw_type": "isolation",
+        "issuing_engineer_id": "bench-engineer",
+        "site_id": "RJG",
+        "source_system": "ptw_system"
+      },
+      "must_be_critical": true,
+      "quarantine_must_be_labelled": true
+    },
+    {
+      "id": "B05",
+      "trigger": "equipment_tag_out",
+      "rationale": "Tag-out brief must name the asset being removed from service.",
+      "event": {
+        "asset_id": "EQ-102",
+        "tag_out_reason": "Planned seal inspection",
+        "performed_by": "bench-tech",
+        "site_id": "RJG",
+        "source_system": "cmms"
+      },
+      "must_all": ["EQ-102"],
+      "must_cite_sources": false
+    },
+    {
+      "id": "B06",
+      "trigger": "inspection_complete",
+      "rationale": "A failed inspection must raise a warning, not read as routine.",
+      "event": {
+        "asset_id": "XV-203",
+        "inspection_type": "statutory",
+        "result": "failed",
+        "performed_by": "bench-inspector",
+        "findings": "Seat leakage beyond acceptance criteria",
+        "site_id": "RJG",
+        "source_system": "cmms"
+      },
+      "must_all": ["XV-203"],
+      "must_warn": true
+    }
+  ]
+}
