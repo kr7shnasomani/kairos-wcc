@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_4XwxHOCZDI4Ioir6XEj4pubr3zhC",
+  "orgId": "team_CV55a739gesEJLo0ydqxhrwZ",
+  "projectName": "kairos",
+  "settings": {
+    "createdAt": 1784312203095,
+    "framework": "nextjs",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": "frontend",
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}
