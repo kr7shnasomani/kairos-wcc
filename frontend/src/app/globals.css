@@ -1,0 +1,911 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Kairos workspace theme. ONE UI, THREE PALETTES (light · dark · sunlight/high-contrast),
+   plus one permanently dark scope (.sidebar-scope) for the rail and the login panel.
+   Light is default; [data-theme="dark"] recolors, never restructures.
+   Brand typography and base surfaces match the public landing page.
+   ============================================================ */
+
+:root {
+  /* surfaces + text (light / default) */
+  --canvas: #ffffff;      /* landing page ground */
+  --surface: #ffffff;     /* card */
+  --surface-2: #f8f8f8;   /* landing page band / inset */
+  --line: #e5e3df;        /* landing page hairline */
+  --ink: #0b1015;         /* landing page primary text */
+  --muted: #3f3f3f;       /* landing page secondary text */
+
+  /* brand */
+  --accent: #d93400;      /* landing action variant; AA against white */
+  --accent-fill: #d93400; /* filled controls with white text */
+  --accent-soft: #fff0eb; /* accent wash */
+  --on-accent: #ffffff;
+
+  /* semantic status — authority / verification / severity */
+  --danger: #a81f28;      /* 356.1deg - 18.3deg off --accent so alarm != brand; 7.26:1 on white */
+  --on-danger: #ffffff;   /* text on a FILLED danger block (button, count badge, banner) */
+  /* The hover sweep under a button's label. Deliberately NOT --ink: that is
+     near-white in dark mode, which would erase the label mid-sweep. */
+  --sweep: #0b1015;
+  --on-sweep: #ffffff;
+  --caution: #9a5b00;
+  /* Text on a caution tint (StatusBadge). --caution itself measured 4.35:1 on its own 16% tint
+     over a white row, under AA's 4.5:1 for 11px text. This measures 5.16:1 there and 4.89:1 on
+     surface-2 (measured in the browser, 2026-09-22). Plain caution text on white stays --caution (5.42:1). */
+  --caution-ink: #8a5100;
+  --verified: #216d3b;
+  --info: #1d4ed8;
+  --link: #1d4ed8;        /* clickable identifiers - never --accent, never --danger */
+  --validation: #6d28d9;  /* under validation / review */
+
+  /* Square chrome, as on the landing page. Tailwind v4's rounded-{xs…4xl}
+     utilities read these variables, and unlayered :root beats its @layer theme
+     defaults, so this one block squares every card, button, input and tab.
+     rounded-full is not variable-driven and stays round: dots, avatars. */
+  --radius: 0;
+  --radius-lg: 0;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+
+  /* Overlay scrim. One token so every dialog/panel/drawer dims identically.
+     The nav rail is permanently dark (.sidebar-scope), so a heavy black wash
+     turns its icons into mud — the dark theme therefore dims less, not more. */
+  --scrim: rgb(0 0 0 / 0.45);
+}
+
+:root[data-theme="dark"] {
+  /* Three separated greys. The rail is pinned at #0a0a0a in every theme, so the
+     canvas cannot also be #0a0a0a: the rail stopped reading as its own surface
+     and cards floated on nothing. Ink on #101010 still measures 17.4:1. */
+  --canvas: #101010;      /* page ground, one step up from the rail */
+  --surface: #181818;     /* cards */
+  --surface-2: #222222;   /* insets, hover */
+  --line: #ffffff26;      /* hairlines need more presence on dark than on white */
+  --ink: #f5f5f4;
+  --muted: #a3a09b;
+
+  --accent: #ff6a1f;
+  --accent-fill: #d93400; /* retains AA contrast with white text */
+  --accent-soft: #3a1b0d;
+  --on-accent: #ffffff;
+
+  --danger: #e85a63;      /* 356.2deg - 23.9deg off --accent; 5.33:1 on --surface */
+  /* The dark red is light, so white on it measures 3.6:1 — under AA for button text.
+     Dark ink on the same fill measures ~5:1 and keeps the block reading as an alarm. */
+  --on-danger: #1b0e0f;
+  --caution: #f5a623;
+  --caution-ink: var(--caution); /* already 6.77:1 on its tint over the dark surface */
+  --verified: #4fa96b;
+  --info: #5b8def;
+  --link: #7aa2f7;
+  --validation: #a78bfa;
+
+  /* The sweep is always the opposite of the page, or it vanishes into it: near-black
+     under white, near-white under the dark canvas. */
+  --sweep: #f5f5f4;
+  --on-sweep: #0b1015;
+
+  --scrim: rgb(0 0 0 / 0.28);
+}
+
+/* Map tokens → Tailwind v4 utilities (bg-surface, text-ink, border-line, …) */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-page: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-on-danger: var(--on-danger);
+  --color-danger: var(--danger);
+  --color-caution: var(--caution);
+  --color-caution-ink: var(--caution-ink);
+  --color-verified: var(--verified);
+  --color-info: var(--info);
+  --color-link: var(--link);
+  --color-validation: var(--validation);
+
+  --font-sans: var(--font-dm), var(--font-noto-devanagari), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument), var(--font-noto-devanagari), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-card: var(--radius-lg);
+
+  /* Type scale — the only sanctioned sizes (plus built-in text-xs/sm for 12/14 aliases).
+     Arbitrary text-[Npx] is drift; add a step here instead. Canvas node labels
+     (text-[9px]) are the one deliberate density exception. */
+  --text-micro: 10px;
+  --text-label: 11px;
+  --text-caption: 12px;
+  --text-body: 13px;
+  --text-subtitle: 15px;
+  --text-title: 20px;
+  --text-display: 28px;
+  --text-hero: 40px;     /* workspace page titles, the landing's display voice */
+}
+
+/* The landing never floats a surface on a shadow; hairlines do that job. The two
+   small steps (88 in-page uses) go flat. md and up stay for real overlays:
+   modals, menus, the command palette. */
+@theme {
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+}
+
+/* React Flow zoom/fit controls — token-driven so both palettes work
+   (the library default is white-on-white in dark mode). */
+.react-flow__controls {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: none;
+}
+.react-flow__controls-button {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+.react-flow__controls-button:hover {
+  background: var(--surface-2);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+/* Motion floor — one shared enter idiom for overlays; neutralized by the
+   prefers-reduced-motion rule below like every other animation. */
+@keyframes overlay-in {
+  from { opacity: 0; }
+}
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+/* Short fade + rise for revealed panels (ChartCard expand). Routes use .app-route. */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+/* Mobile "More" bottom sheet entrance. */
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+}
+/* Staggered list-item entrance — pair with lib/motion staggerDelay(). */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+/* Meter/confidence bar fill-in — set transform-origin: left on the element. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+}
+
+/* This rule is UNLAYERED, and unlayered declarations outrank everything in
+   @layer utilities regardless of specificity. That means it silently beats
+   every Tailwind border-color utility (border-accent, border-(--lp-accent), …).
+   The app relies on that default, so it stays; the landing page is excluded so
+   its accent and dark-hairline borders actually apply. */
+*:not(.landing, .landing *) {
+  border-color: var(--line);
+}
+
+html {
+  color-scheme: light;
+  /* Overlays lock `overflow: hidden` on <html>; without a reserved gutter the
+     scrollbar disappears and the whole shell (rail included) jumps ~15px right. */
+  scrollbar-gutter: stable;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Workspace headings share the landing page's Instrument Sans voice. */
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* The landing's display treatment: Instrument 500, line-height 1, tight
+   tracking. For page titles and headline numerals, not body headings. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Children rise in one after another, like the landing's [data-stagger].
+   Mount-time rather than scroll-driven: workspace content is above the fold. */
+.stagger > * {
+  animation: rise-in 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.stagger > :nth-child(2) { animation-delay: 0.05s; }
+.stagger > :nth-child(3) { animation-delay: 0.1s; }
+.stagger > :nth-child(4) { animation-delay: 0.15s; }
+.stagger > :nth-child(5) { animation-delay: 0.2s; }
+.stagger > :nth-child(n + 6) { animation-delay: 0.25s; }
+
+/* Hairline mesh, as in the landing's capability grid: the container draws the
+   top/left rules and every cell its right/bottom, so borders never double and
+   a short last row leaves the page ground showing, not a grey block. Unlayered
+   on purpose: it must beat a cell's own `border` utility (KpiCard carries one
+   for standalone use). Pair cells with .lp-cell for the accent top-bar hover. */
+.mesh {
+  display: grid;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.mesh > * {
+  border-style: solid;
+  border-width: 0 1px 1px 0;
+}
+
+
+/* Numerals, tags, codes line up and read as data */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+
+/* In @layer base so explicit outline-* utilities (e.g. the palette input's
+   outline-none, whose focus state is carried by its container) can win —
+   unlayered rules would override them. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Theme flip. The toggle wraps the attribute write in a view transition, so the
+   whole page crossfades between palettes instead of snapping. Snapshot animation
+   only — nothing moves, and reduced-motion callers skip the transition entirely. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/* Print (audit-pack export etc.): paper-white regardless of theme, no chrome. */
+@media print {
+  :root, :root[data-theme="dark"] {
+    --canvas: #fff;
+    --surface: #fff;
+    --surface-2: #fff;
+    --ink: #000;
+  }
+  body {
+    background: #fff;
+  }
+}
+
+/* ── Sunlight / high-contrast palette (data-contrast="high") ──────────────
+   Same structural tokens, raised contrast for outdoor legibility.
+   One UI, three palettes. Never a separate dark/contrast markup tree. */
+[data-contrast="high"] {
+  --canvas: #edeae0;
+  --surface: #ffffff;
+  --surface-2: #f0ede4;
+  --line: #b8b0a0;
+  --ink: #080706;
+  --muted: #3c3830;
+  --accent: #c03a10;
+  --accent-soft: #f6d3c5;
+  --on-accent: #ffffff;
+  --danger: #b02218;
+  --caution: #c07808;
+  --verified: #1e6030;
+  --info: #1a50c8;
+  --link: #0b3fb5;
+  --validation: #5b21b6;
+}
+
+[data-contrast="high"][data-theme="dark"] {
+  --canvas: #000000;
+  --surface: #0c0a08;
+  --surface-2: #161210;
+  --line: #504840;
+  --ink: #ffffff;
+  --muted: #c8c0b0;
+  --accent: #ff6030;
+  --accent-soft: #3c1a0a;
+  --danger: #ff5040;
+  --caution: #ffb020;
+  --verified: #48d880;
+  --info: #60a0ff;
+}
+
+/* ── Sidebar palette — permanently dark in every theme ─────────────────────
+   The rail is the app's frame (template signature). .sidebar-scope remaps the
+   generic tokens locally, so every utility inside (text-muted, bg-surface-2,
+   border-line, bg-accent-soft…) recolors with zero markup changes. */
+:root {
+  --sidebar: #0a0a0a;
+  --sidebar-hover: #141414;
+  --sidebar-line: #ffffff1f;
+  --sidebar-fg: #f5f5f4;
+  --sidebar-muted: #a3a09b;
+  --sidebar-accent: #ff6a1f;
+  --sidebar-active: #3a1b0d;
+}
+:root[data-theme="dark"] {
+  --sidebar: #0a0a0a;
+}
+[data-contrast="high"] {
+  --sidebar: #0c0a08;
+  --sidebar-hover: #161210;
+  --sidebar-line: #504840;
+  --sidebar-fg: #ffffff;
+  --sidebar-muted: #c8c0b0;
+  --sidebar-accent: #ff6030;
+  --sidebar-active: #3c1a0a;
+}
+.sidebar-scope {
+  /* Inverted: on the dark rail the sweep is light and the glyph goes dark. An ink
+     sweep on an ink rail made the Ingest + disappear mid-hover. */
+  --sweep: var(--sidebar-fg);
+  --on-sweep: var(--sidebar);
+  --surface: var(--sidebar);
+  --surface-2: var(--sidebar-hover);
+  --line: var(--sidebar-line);
+  --ink: var(--sidebar-fg);
+  --muted: var(--sidebar-muted);
+  --accent: var(--sidebar-accent);
+  --accent-soft: var(--sidebar-active);
+  --link: #7aa2f7;
+  --validation: #a78bfa;
+  background: var(--sidebar);
+  color: var(--sidebar-fg);
+}
+
+/* Bright orange stays available for dark-mode text and focus. Filled actions
+   need the darker landing orange so white labels remain accessible. */
+.bg-accent.text-on-accent {
+  background-color: var(--accent-fill);
+}
+
+/* Fluid sibling cards: fill each row, but stack when two readable tiles no longer fit. */
+.fluid-tile-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: stretch;
+  gap: 1.5rem;
+}
+.fluid-tile-pair > * {
+  min-width: 0;
+  height: 100%;
+}
+
+/* ── Public landing page: its own scoped design language ─────────────────
+   The marketing surface commits to a single light palette (its dark bands are
+   part of the composition, not a theme), so it does NOT follow the app's
+   light/dark token pairs. Everything is namespaced --lp-* under .landing and
+   never leaks into the app, which keeps the Paper theme and Kairos Orange.
+   Markup consumes these with Tailwind v4 arbitrary-variable syntax:
+   bg-(--lp-bg), text-(--lp-muted), border-(--lp-line), never raw hex. */
+.landing {
+  /* The base ground is WHITE. #f8f8f8 is the *alternating* band only. Getting
+     this backwards is what makes a copy of this design read flat and grey. */
+  --lp-bg: #ffffff;            /* page ground */
+  --lp-band: #f8f8f8;          /* alternating section band */
+  --lp-surface: #ffffff;       /* cards */
+  --lp-ink: #0b1015;           /* headings + body ink (not pure black) */
+  --lp-muted: #3f3f3f;         /* body copy */
+  --lp-line: #e5e3df;          /* warm hairline, the frame rails */
+  /* Three accents, split by contrast duty. #ff3c00 is the reference colour
+     but only clears 3:1, so it is confined to jobs where 3:1 is conformant:
+     display type at 24px+, fills, rules and corner marks.
+       --lp-accent          #ff3c00  3.35:1 on --lp-bg  → large text + decoration
+       --lp-accent-strong   #d93400  4.73:1 under white → fills behind small white text
+       --lp-accent-text     #cc3100  4.94:1 on --lp-bg  → small accent text on light
+     All three are visually near-identical at the sizes they are used. */
+  --lp-accent: #ff3c00;
+  --lp-accent-strong: #d93400;
+  --lp-accent-text: #cc3100;
+  --lp-charcoal: #2e2e2e;      /* heading highlight box */
+  --lp-dark: #0a0a0a;          /* dark bands */
+  --lp-dark-surface: #141414;  /* cards on dark */
+  --lp-dark-line: #ffffff1f;   /* hairline on dark */
+  --lp-dark-muted: #a3a09b;    /* body copy on dark */
+  --lp-bar-idle: #3a3a3a;      /* non-leading chart bar, solid so gridlines do not show through */
+  --lp-tab: #ededed;           /* inactive tab cell */
+  --lp-tab-hover: #e4e4e4;     /* inactive tab cell, hovered (darkens, never lightens) */
+  --lp-tab-line: #c9c9c9;      /* cell borders, decorative and never text */
+  /* Inactive tab *label*. The reference uses 40%-opacity ink here (~1.5:1);
+     these tabs are 20px body-weight text, so they need the full 4.5:1.
+     4.73 on the band, 5.02 on white. Not to be confused with --lp-tab-line,
+     which is decorative rules only. */
+  --lp-tab-idle: #6f6f6f;
+
+  /* Remap the two generic tokens that leak in from unscoped rules: the global
+     `* { border-color: var(--line) }` reset, and the :focus-visible ring. */
+  --line: var(--lp-line);
+  --accent: var(--lp-accent-strong);
+
+  background: var(--lp-bg);
+  color: var(--lp-ink);
+  font-family: var(--font-dm), Inter, system-ui, sans-serif;
+
+  /* The corner ticks are centred ON the frame edge, so they hang 5px outside
+     it. Once the frame reaches the viewport (below ~1216px) that became 4px of
+     horizontal page scroll. `clip` rather than `hidden`: hidden would make this
+     a scroll container and break the sticky header. */
+  overflow-x: clip;
+}
+
+/* Display type is the loudest signal of the reference: Instrument Sans 500,
+   line-height 1, tracking -0.05em. Sizes stay as explicit per-section values, because
+   the app's --text-* scale tops out at 28px and must not grow display steps
+   that only a marketing page needs. */
+.landing h1,
+.landing h2,
+.landing h3,
+.landing .lp-display {
+  font-family: var(--font-instrument), Inter, system-ui, sans-serif;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+}
+
+/* Tailwind v4's preflight leaves buttons at cursor:default, so every button on
+   the page felt unclickable next to the links. Fixed once here rather than
+   sprinkling cursor-pointer through the markup. */
+/* Tailwind v4 leaves <button> at cursor:default. App-wide, not just .landing. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+.landing button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* The structural signature: a centred column with hairline rails running down
+   both sides for the whole page height. */
+.lp-frame {
+  max-width: 76rem;
+  margin-inline: auto;
+  border-inline: 1px solid var(--lp-line, var(--line));
+}
+.lp-frame--dark {
+  border-inline-color: var(--lp-dark-line);
+}
+
+/* Alternating band. Also retints the corner ticks so they keep punching
+   through the frame rule rather than sitting on the wrong ground. */
+.lp-band {
+  background: var(--lp-band);
+  --lp-tick-bg: var(--lp-band);
+}
+
+/* Surveyor marks pinned to the frame corners. Position with utilities. */
+.lp-tick {
+  position: absolute;
+  z-index: 10;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--lp-accent, var(--accent));
+  background: var(--lp-tick-bg, var(--lp-bg, var(--canvas)));
+}
+.lp-tick--solid {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  background: var(--lp-accent);
+}
+
+/* Media panels: layered gradient standing in for the reference's rendered
+   art, so the page needs no image assets. .lp-dither adds the pixel grain
+   that gives those panels their texture. */
+/* The panel reads as a lit surface rather than a flat ramp: one warm key light
+   off-centre, deep falloff into the corners, and an inset vignette that keeps
+   the edges from glowing. Layer order is top-down, so the grain sits above the
+   gradients. Grain is an inline feTurbulence — desaturated, because raw
+   turbulence is RGB confetti — which keeps the page free of image assets. */
+.lp-media {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.42'/%3E%3C/svg%3E")
+      0 0 / 160px 160px repeat,
+    radial-gradient(105% 80% at 10% 4%, #150c06 0%, rgb(0 0 0 / 0) 52%),
+    radial-gradient(58% 50% at 79% 15%, #ffa257 0%, rgb(0 0 0 / 0) 62%),
+    radial-gradient(95% 75% at 86% 30%, #f0570c 0%, rgb(0 0 0 / 0) 58%),
+    radial-gradient(135% 115% at 48% 112%, #9c1c00 0%, rgb(0 0 0 / 0) 64%),
+    linear-gradient(152deg, #170601 0%, #6b1902 46%, #d9490a 100%);
+  box-shadow: inset 0 0 100px 26px rgb(10 3 0 / 0.42);
+}
+.lp-dither::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#000 0.5px, rgb(0 0 0 / 0) 0.6px);
+  background-size: 3px 3px;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+/* Product mockups only. The reference keeps page chrome perfectly square but
+   its in-mockup UI has soft corners and depth, which is what stops the mocks
+   reading flat. Deliberately NOT applied to buttons, tabs, chips or sections. */
+.lp-mock {
+  border-radius: 10px;
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.55);
+}
+.lp-mock-sm {
+  border-radius: 6px;
+}
+
+/* Dashed column rules, as used down the FAQ. */
+.lp-dashed {
+  border-color: color-mix(in srgb, var(--lp-dark-muted) 40%, transparent);
+  border-style: dashed;
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────
+   Deliberately minimal: a reveal on scroll, a marquee, and bars that grow.
+   Everything is gated behind .lp-anim, which the page adds from an effect on
+   mount, so if JS never runs nothing is left invisible. The global
+   prefers-reduced-motion rule collapses all of these to their end state. */
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lp-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes lp-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.lp-anim [data-reveal] {
+  opacity: 0;
+}
+.lp-anim [data-reveal].is-in {
+  animation: lp-rise 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+/* Children stagger behind their revealed parent. */
+.lp-anim [data-reveal].is-in > [data-stagger] {
+  animation: lp-rise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.lp-anim [data-reveal].is-in > [data-stagger]:nth-child(2) { animation-delay: 0.06s; }
+.lp-anim [data-reveal].is-in > [data-stagger]:nth-child(3) { animation-delay: 0.12s; }
+.lp-anim [data-reveal].is-in > [data-stagger]:nth-child(4) { animation-delay: 0.18s; }
+.lp-anim [data-reveal].is-in > [data-stagger]:nth-child(5) { animation-delay: 0.24s; }
+.lp-anim [data-reveal].is-in > [data-stagger]:nth-child(6) { animation-delay: 0.3s; }
+
+.lp-bar {
+  transform-origin: bottom;
+}
+/* The reference's leading bar is not flat: it lightens toward the top, which is
+   what gives the chart its depth. */
+.lp-bar--hero {
+  background: linear-gradient(to bottom, #ff7a3d 0%, var(--lp-accent) 42%, #a82600 100%);
+}
+.lp-anim [data-reveal].is-in .lp-bar {
+  animation: lp-grow 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Hero orbit: a pulse riding each wire into the answer card, so the page opens
+   on the claim it makes — sources converging into one governed answer. Uses
+   offset-distance rather than a stroke-dash march: it composites, and it stops
+   dead under prefers-reduced-motion. Gated behind .lp-anim like everything
+   else, so with no JS the dots never appear parked at the start of the wire. */
+@keyframes lp-orbit-pulse {
+  0% { offset-distance: 0%; opacity: 0; }
+  12% { opacity: var(--pulse-peak, 0.42); }
+  80% { opacity: var(--pulse-peak, 0.42); }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+.lp-orbit-pulse {
+  opacity: 0;
+  offset-rotate: 0deg;
+}
+.lp-anim .lp-orbit-pulse {
+  animation: lp-orbit-pulse 5.4s linear infinite;
+}
+/* The cited three carry the answer, so they run brighter and quicker than the
+   seven that are merely connected. */
+.lp-anim .lp-orbit-pulse--cited {
+  --pulse-peak: 1;
+  animation-duration: 3.4s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-anim .lp-orbit-pulse { animation: none !important; }
+}
+
+/* Ring nodes. Below lg the chips are ordinary flow items in a wrapped row; from
+   lg up they take the point the SVG computed for them, centred on the ring. */
+@media (min-width: 64rem) {
+  .lp-orbit-node {
+    position: absolute;
+    left: var(--orbit-x);
+    top: var(--orbit-y);
+    transform: translate(-50%, -50%);
+  }
+}
+
+.lp-marquee-track {
+  animation: lp-marquee 36s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The reference does exactly this: kill the animation rather than let the
+     global duration reset freeze it mid-slide with half its content off-screen. */
+  .lp-marquee-track { animation: none !important; }
+}
+
+/* Primary actions fill with ink from the left on hover — the calm reading of the
+   landing's pixel wipe, as one compositor-only transform instead of 72 spans.
+   The host needs `position: relative`; put labels above the sweep with `z-10`.
+   Touch devices get nothing, and the global reduced-motion rule flattens it. */
+.fill-sweep {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+@media (hover: hover) {
+  .fill-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--sweep);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .fill-sweep:enabled:hover::after,
+  .fill-sweep:enabled:focus-visible::after,
+  a.fill-sweep:not([aria-disabled="true"]):hover::after,
+  a.fill-sweep:not([aria-disabled="true"]):focus-visible::after {
+    transform: scaleX(1);
+  }
+  /* Unlayered, so it beats the text-* utility the control was given: a ghost
+     button's ink label has to flip once the ink sweep is under it. Disabled
+     controls are excluded from both halves — a dead button must not react. */
+  .fill-sweep:enabled:hover,
+  .fill-sweep:enabled:focus-visible,
+  a.fill-sweep:not([aria-disabled="true"]):hover,
+  a.fill-sweep:not([aria-disabled="true"]):focus-visible {
+    color: var(--on-sweep);
+  }
+}
+
+/* ── Hover ────────────────────────────────────────────────────────────────
+   Shared with the workspace: outside .landing the --lp-* lookups fall back to
+   the app tokens, so Card/KpiCard/meshes hover exactly like the landing.
+   The reference lifts a card slightly and turns its border accent. Applied to
+   every box that reads as a discrete object. Transform stays on the compositor
+   (scale only), so none of this triggers layout. */
+.lp-card {
+  transition:
+    transform 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (hover: hover) {
+  .lp-card:hover {
+    position: relative;
+    z-index: 10;
+    transform: scale(1.02);
+    border-color: var(--lp-accent, var(--accent));
+  }
+  /* Grid cells sit in a hairline mesh, so they lift by filling instead of
+     scaling. Scaling one cell of a 1px-gap grid just tears the mesh. */
+  .lp-cell {
+    transition:
+      background-color 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+      color 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  .lp-cell::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 2px;
+    background: var(--lp-accent, var(--accent));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .lp-cell:hover::after {
+    transform: scaleX(1);
+  }
+  /* An accent wash rather than a flat surface colour: on the white sections
+     --lp-surface IS the ground, so filling with it changed nothing. */
+  .lp-cell:hover {
+    background: color-mix(in srgb, var(--lp-accent, var(--accent)) 6%, var(--lp-surface, var(--surface)));
+  }
+  .lp-cell--dark:hover {
+    background: color-mix(in srgb, var(--lp-accent) 14%, var(--lp-dark-surface));
+  }
+}
+
+/* Panel swap on the tabbed sections: a crossfade, keyed by React on the panel. */
+.lp-anim .lp-swap {
+  animation: lp-rise 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes app-route-enter {
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* `backwards`, never `both`: a retained `transform: translateY(0)` makes this a
+   containing block for every `position: fixed` descendant, which pinned overlays
+   (quarantine ItemPanel, modals) to the route element and scrolled them with the
+   page instead of the viewport. */
+.app-route { animation: app-route-enter 0.2s ease-out backwards; }
+
+@keyframes drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Nav rail — collapsible (senior review item 2)
+
+   Width and the collapsed presentation are driven by `data-nav` on <html>,
+   which layout.tsx sets BEFORE first paint from localStorage. Doing it in CSS
+   rather than React state is what keeps a collapsed rail from flashing wide on
+   every navigation; the React state only owns the toggle button and writes the
+   preference back.
+
+   Every collapsed-state selector is scoped under `[data-rail]`, which only the
+   desktop aside carries. The mobile drawer renders the same component and must
+   keep its labels regardless of the desktop preference.
+--------------------------------------------------------------------------- */
+:root {
+  --rail-w: 316px;
+}
+:root[data-nav="collapsed"] {
+  --rail-w: 68px;
+}
+
+/* Hiding with display:none also removes the text from the accessibility tree,
+   which is why every rail link carries its own aria-label. */
+:root[data-nav="collapsed"] [data-rail] .rail-label {
+  display: none;
+}
+/* Every rail row is the same height in BOTH states. Without this the row height
+   comes from its content: the label's line box (19.5px) expanded vs the bare
+   18px icon collapsed. That 1.5px compounds down the column — the last icon
+   landed 20px off its expanded position, so collapsing re-flowed the rail
+   instead of minimising it in place. */
+[data-rail] .rail-link {
+  min-height: 2.25rem;
+}
+:root[data-nav="collapsed"] [data-rail] .rail-link {
+  justify-content: center;
+}
+/* "0/6" with no label is a riddle, and the row is what tipped the collapsed admin
+   rail into scrolling. The governor state comes back when the rail expands. */
+:root[data-nav="collapsed"] [data-rail] .rail-governor {
+  display: none;
+}
+/* 68px has room for one square, so Ingest drops out (⌘K and /documents still
+   reach it) rather than stacking: a second row here moved every nav icon down. */
+:root[data-nav="collapsed"] [data-rail] .rail-actions {
+  justify-content: center;
+}
+:root[data-nav="collapsed"] [data-rail] [data-rail-ingest] {
+  display: none;
+}
+/* The foot may grow — it eats scroll height, not alignment. */
+:root[data-nav="collapsed"] [data-rail] .rail-foot {
+  flex-direction: column;
+  align-items: center;
+}
+:root[data-nav="collapsed"] [data-rail] .rail-actions > .rail-link {
+  flex: none;
+  width: 2.25rem;
+  padding-inline: 0;
+}
+:root[data-nav="collapsed"] [data-rail] .rail-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+/* The auth-gate rail renders BrandLink without the shell around it. */
+:root[data-nav="collapsed"] [data-rail] .rail-brand > img {
+  margin-inline: auto;
+}
+:root[data-nav="collapsed"] [data-rail] .rail-brand-row {
+  /* Height, direction and the bottom hairline all stay: the row holds only the
+     mark now, so it fits 68px unchanged and the header line still runs across
+     rail and content. */
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* Short viewports (laptop at 125% scale, browser with two toolbar rows): the
+   expanded rail runs out of height, and groups scroll out of sight with no
+   scrollbar to hint at it, so the last visible item reads as clipped under
+   the Governor pill. Compress the rhythm instead of scrolling. Height-scoped
+   so tall screens and the mobile drawer keep their touch-sized rows.
+
+   Re-measured 2026-09-22 with the sidebar-first shell (search + Ingest at the
+   top, account at the foot, no desktop top bar) and 37.5px row pitch: at
+   1440x900 the engineer rail has ~72px spare and the full admin rail (Voice,
+   Deviation added) fits with ~5px. Below ~890px it scrolls, which is the
+   honest outcome. Adding nav items moves every one of these numbers. */
+@media (max-height: 1020px) {
+  [data-rail] .rail-brand-row {
+    padding-block: 1rem;
+  }
+  [data-rail] .rail-nav {
+    --rail-section-gap: 1rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.25rem;
+  }
+  [data-rail] .rail-link {
+    /* 7px, not 4px: at 4px rows sat 2px apart and read as a cramped list.
+       The 34px floor (vs 36px on tall screens) buys back the ~32px the full
+       admin rail needs here, and applies to BOTH states so rows stay aligned. */
+    padding-block: 0.4375rem;
+    min-height: 2.125rem;
+  }
+}
+
+/* The rail scrolls; the scrollbar never shows. Review item 2, second half. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* next.config.ts sets `devIndicators: false`, but Next overrides that flag the
+ * moment the dev overlay's error count is non-zero — it re-shows the logo badge
+ * carrying the issue count, which lands in screenshots and over the UI during
+ * manual testing. The badge lives in the shadow root of <nextjs-portal>, which
+ * page CSS cannot reach, so hide the host element instead.
+ * Dev-only element; the rule is inert in a production build.
+ * Trade-off: this also hides the full-screen error overlay. Errors still reach
+ * the browser console and `docker logs kairos-frontend`. */
+/* Scoped to :not([data-devtools="show"]) rather than hiding unconditionally, so the overlay
+ * can be brought back to diagnose something without editing CSS:
+ *   localStorage.setItem("kairos-devtools", "show")  // then reload
+ *   localStorage.removeItem("kairos-devtools")       // hide again
+ * When shown no rule matches at all, so Next's own styles apply unchanged. */
+:root:not([data-devtools="show"]) nextjs-portal,
+:root:not([data-devtools="show"]) script[data-nextjs-dev-overlay] {
+  display: none !important;
+}
